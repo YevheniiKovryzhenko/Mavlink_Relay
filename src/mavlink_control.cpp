@@ -55,6 +55,8 @@
 
 #include "mavlink_control.h"
 
+bool termination_requested = false;
+
 
 // ------------------------------------------------------------------------------
 //   TOP
@@ -80,12 +82,20 @@ top (int argc, char **argv)
 	char *udp_ip = (char*)"127.0.0.1";
 	int udp_port = 14540;
 	bool autotakeoff = false;
-	bool use_mocap = false;
+
+	bool enable_mocap = false;
 	char* mocap_ip = (char*)"127.0.0.1";
+	int mocap_ID = 1;
+
+	bool enable_control = false;
+
+	bool print_control = false;
+	bool print_vpe = false;
+	bool print_telemetry = false;
 
 	// do the parse, will throw an int if it fails
 	parse_commandline(argc, argv, use_uart, uart_name, baudrate, use_udp, udp_ip, udp_port, autotakeoff,
-		use_mocap, mocap_ip);
+		enable_mocap, mocap_ip, mocap_ID, enable_control, print_control, print_telemetry, print_vpe);
 
 	bool use_uart_or_udp = use_uart || use_udp;
 	// --------------------------------------------------------------------------
@@ -103,36 +113,36 @@ top (int argc, char **argv)
 	 *
 	 */
 	Generic_Port *port;
-	if (use_uart_or_udp)
+
+	if (use_udp)
 	{
-		if (use_udp)
-		{
-			port = new UDP_Port(udp_ip, udp_port);
-		}
-		else
-		{
-			port = new Serial_Port(uart_name, baudrate);
-		}
+		port = new UDP_Port(udp_ip, udp_port);
+	}
+	else
+	{
+		port = new Serial_Port(uart_name, baudrate);
+	}
 
+	/*
+	* Instantiate an autopilot interface object
+	*
+	* This starts two threads for read and write over MAVlink. The read thread
+	* listens for any MAVlink message and pushes it to the current_messages
+	* attribute.  The write thread at the moment only streams a position target
+	* in the local NED frame (mavlink_set_position_target_local_ned_t), which
+	* is changed by using the method update_setpoint().  Sending these messages
+	* are only half the requirement to get response from the autopilot, a signal
+	* to enter "offboard_control" mode is sent by using the enable_offboard_control()
+	* method.  Signal the exit of this mode with disable_offboard_control().  It's
+	* important that one way or another this program signals offboard mode exit,
+	* otherwise the vehicle will go into failsafe.
+	*
+	*/
+	Autopilot_Interface autopilot_interface(port, mocap_ip, mocap_ID);	
 
-
-
-		/*
-		 * Instantiate an autopilot interface object
-		 *
-		 * This starts two threads for read and write over MAVlink. The read thread
-		 * listens for any MAVlink message and pushes it to the current_messages
-		 * attribute.  The write thread at the moment only streams a position target
-		 * in the local NED frame (mavlink_set_position_target_local_ned_t), which
-		 * is changed by using the method update_setpoint().  Sending these messages
-		 * are only half the requirement to get response from the autopilot, a signal
-		 * to enter "offboard_control" mode is sent by using the enable_offboard_control()
-		 * method.  Signal the exit of this mode with disable_offboard_control().  It's
-		 * important that one way or another this program signals offboard mode exit,
-		 * otherwise the vehicle will go into failsafe.
-		 *
-		 */
-		Autopilot_Interface autopilot_interface(port);
+	if (enable_control)
+	{
+		autopilot_interface.enable_control();
 
 		/*
 		 * Setup interrupt signal handler
@@ -145,41 +155,78 @@ top (int argc, char **argv)
 		port_quit = port;
 		autopilot_interface_quit = &autopilot_interface;
 		signal(SIGINT, quit_handler);
-
+	}
+	else
+	{
 		/*
-		 * Start the port and autopilot_interface
-		 * This is where the port is opened, and read and write threads are started.
+		 * Setup interrupt signal handler
+		 *
+		 * Responds to early exits signaled with Ctrl-C.  The handler will command
+		 * to exit offboard mode if required, and close threads and the port.
+		 * The handler in this example needs references to the above objects.
+		 *
 		 */
-		port->start();
-		autopilot_interface.start();
+		port_quit = port;
+		autopilot_interface_quit = &autopilot_interface;
+		signal(SIGINT, quit_handler_no_control);
 
+	}		
 
+	if (enable_mocap) //for now don't do control
+	{
+		autopilot_interface.enable_vpe();
+		if (print_vpe) autopilot_interface.enable_print_vpe();
+	}
+
+	if (enable_control)
+	{
+		autopilot_interface.enable_control();
+		if (print_control) autopilot_interface.enable_print_control();
+	}
+
+	autopilot_interface.enable_telemetry();
+	if (print_telemetry) autopilot_interface.enable_print_telemetry();
+
+	/*
+	* Start the port and autopilot_interface
+	* This is where the port is opened, and read and write threads are started.
+	*/
+	port->start();
+	autopilot_interface.start();
+
+	if (enable_control)
+	{
 		// --------------------------------------------------------------------------
 		//   RUN COMMANDS
 		// --------------------------------------------------------------------------
 
 		/*
-		 * Now we can implement the algorithm we want on top of the autopilot interface
-		 */
+		* Now we can implement the algorithm we want on top of the autopilot interface
+		*/
 		commands(autopilot_interface, autotakeoff);
-
-
-		// --------------------------------------------------------------------------
-		//   THREAD and PORT SHUTDOWN
-		// --------------------------------------------------------------------------
-
-		/*
-		 * Now that we are done we can stop the threads and close the port
-		 */
-		autopilot_interface.stop();
-		port->stop();
-
-		delete port;
-
-		// --------------------------------------------------------------------------
-		//   DONE
-		// --------------------------------------------------------------------------
 	}
+
+	while (!termination_requested)
+	{
+		usleep(100000); //wait till user termination
+	}
+
+	// --------------------------------------------------------------------------
+	//   THREAD and PORT SHUTDOWN
+	// --------------------------------------------------------------------------
+
+	/*
+	* Now that we are done we can stop the threads and close the port
+	*/
+	autopilot_interface.stop();
+	port->stop();
+
+	delete port;
+
+	// --------------------------------------------------------------------------
+	//   DONE
+	// --------------------------------------------------------------------------
+
 	// woot!
 	return 0;
 
@@ -245,7 +292,9 @@ commands(Autopilot_Interface &api, bool autotakeoff)
 	for (int i=0; i < 8; i++)
 	{
 		mavlink_local_position_ned_t pos = api.current_messages.local_position_ned;
+#ifdef DEBUG
 		printf("%i CURRENT POSITION XYZ = [ % .4f , % .4f , % .4f ] \n", i, pos.x, pos.y, pos.z);
+#endif // DEBUG		
 		sleep(1);
 	}
 
@@ -268,7 +317,9 @@ commands(Autopilot_Interface &api, bool autotakeoff)
 	for (int i=0; i < 4; i++)
 	{
 		mavlink_local_position_ned_t pos = api.current_messages.local_position_ned;
+#ifdef DEBUG
 		printf("%i CURRENT POSITION XYZ = [ % .4f , % .4f , % .4f ] \n", i, pos.x, pos.y, pos.z);
+#endif // DEBUG		
 		sleep(1);
 	}
 
@@ -290,11 +341,14 @@ commands(Autopilot_Interface &api, bool autotakeoff)
 		for (int i=0; i < 8; i++)
 		{
 			mavlink_local_position_ned_t pos = api.current_messages.local_position_ned;
+#ifdef DEBUG
 			printf("%i CURRENT POSITION XYZ = [ % .4f , % .4f , % .4f ] \n", i, pos.x, pos.y, pos.z);
+#endif // DEBUG			
 			sleep(1);
 		}
-
+#ifdef DEBUG
 		printf("\n");
+#endif // DEBUG	
 
 		// disarm autopilot
 		api.arm_disarm(false);
@@ -313,29 +367,34 @@ commands(Autopilot_Interface &api, bool autotakeoff)
 	// --------------------------------------------------------------------------
 	//   GET A MESSAGE
 	// --------------------------------------------------------------------------
+#ifdef DEBUG
 	printf("READ SOME MESSAGES \n");
+#endif // DEBUG	
 
 	// copy current messages
 	Mavlink_Messages messages = api.current_messages;
 
 	// local position in ned frame
 	mavlink_local_position_ned_t pos = messages.local_position_ned;
+#ifdef DEBUG
 	printf("Got message LOCAL_POSITION_NED (spec: https://mavlink.io/en/messages/common.html#LOCAL_POSITION_NED)\n");
-	printf("    pos  (NED):  %f %f %f (m)\n", pos.x, pos.y, pos.z );
+	printf("    pos  (NED):  %f %f %f (m)\n", pos.x, pos.y, pos.z);
+#endif // DEBUG	
 
 	// hires imu
 	mavlink_highres_imu_t imu = messages.highres_imu;
+#ifdef DEBUG
 	printf("Got message HIGHRES_IMU (spec: https://mavlink.io/en/messages/common.html#HIGHRES_IMU)\n");
 	printf("    ap time:     %lu \n", imu.time_usec);
-	printf("    acc  (NED):  % f % f % f (m/s^2)\n", imu.xacc , imu.yacc , imu.zacc );
+	printf("    acc  (NED):  % f % f % f (m/s^2)\n", imu.xacc, imu.yacc, imu.zacc);
 	printf("    gyro (NED):  % f % f % f (rad/s)\n", imu.xgyro, imu.ygyro, imu.zgyro);
-	printf("    mag  (NED):  % f % f % f (Ga)\n"   , imu.xmag , imu.ymag , imu.zmag );
-	printf("    baro:        %f (mBar) \n"  , imu.abs_pressure);
-	printf("    altitude:    %f (m) \n"     , imu.pressure_alt);
-	printf("    temperature: %f C \n"       , imu.temperature );
+	printf("    mag  (NED):  % f % f % f (Ga)\n", imu.xmag, imu.ymag, imu.zmag);
+	printf("    baro:        %f (mBar) \n", imu.abs_pressure);
+	printf("    altitude:    %f (m) \n", imu.pressure_alt);
+	printf("    temperature: %f C \n", imu.temperature);
 
 	printf("\n");
-
+#endif // DEBUG
 
 	// --------------------------------------------------------------------------
 	//   END OF COMMANDS
@@ -350,14 +409,26 @@ commands(Autopilot_Interface &api, bool autotakeoff)
 //   Parse Command Line
 // ------------------------------------------------------------------------------
 // throws EXIT_FAILURE if could not open the port
-void
-parse_commandline(int argc, char **argv, bool use_uart, char *&uart_name, int &baudrate,
-		bool &use_udp, char *&udp_ip, int &udp_port, bool &autotakeoff,
-	bool &use_mocap, char *&mocap_ip)
+void parse_commandline(int argc, char **argv, bool use_uart, char *&uart_name, int &baudrate,\
+		bool &use_udp, char *&udp_ip, int &udp_port, bool &autotakeoff,\
+	bool &enable_mocap, char *&mocap_ip, int& mocap_ID, bool& enable_control,\
+	bool& print_control, bool& print_telemetry, bool& print_vpe)
 {
 
 	// string for command line usage
-	const char *commandline_usage = "usage: mavlink_control [-d <devicename> -b <baudrate>] [-u <udp_ip> -p <udp_port>] [-a ]\n [-m <mocap_ip>]";
+	const char* commandline_usage = \
+		"usage of mavlink_control:\n"
+		"-h				help			prints this message)\n"
+		"-d				device			specify device name,		/dev/ttyUSB0\n"
+		"-b				baudrate		specify baudrate,			57600\n"
+		"-u				udp_ip			specify upd address,		127.0.0.1\n"
+		"-p				port			specify udp port,			14540\n"
+		"-c				enable_control	enable control algorithm\n"
+		"-m				mocap_ip		specify mocap interface		127.0.0.1\n"
+		"-mI			mocap_ID		specify frame ID from mocap	1\n"
+		"-pc			print_control	print setpoints to console\n"
+		"-pm			print_mocap		print mocap tracking\n"
+		"-pt			print_telemetry print data from the vehicle\n";
 
 	// Read input arguments
 	for (int i = 1; i < argc; i++) { // argv[0] is "mavlink"
@@ -424,7 +495,18 @@ parse_commandline(int argc, char **argv, bool use_uart, char *&uart_name, int &b
 			if (argc > i + 1) {
 				i++;
 				mocap_ip = argv[i];
-				use_mocap = true;
+				enable_mocap = true;
+			}
+			else {
+				printf("%s\n", commandline_usage);
+				throw EXIT_FAILURE;
+			}
+		}
+		if (strcmp(argv[i], "-mI") == 0 || strcmp(argv[i], "--mocap_ID") == 0) {
+			if (argc > i + 1) {
+				i++;
+				mocap_ID = atoi(argv[i]);
+				enable_mocap = true;
 			}
 			else {
 				printf("%s\n", commandline_usage);
@@ -432,6 +514,20 @@ parse_commandline(int argc, char **argv, bool use_uart, char *&uart_name, int &b
 			}
 		}
 
+		if (strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--enable_control") == 0) {
+			enable_control = true;
+		}
+
+		//printf settings
+		if (strcmp(argv[i], "-pm") == 0 || strcmp(argv[i], "--print_mocap") == 0) {
+			print_vpe = true;
+		}
+		if (strcmp(argv[i], "-pc") == 0 || strcmp(argv[i], "--print_control") == 0) {
+			print_control = true;
+		}
+		if (strcmp(argv[i], "-pt") == 0 || strcmp(argv[i], "--print_telemetry") == 0) {
+			print_telemetry = true;
+		}
 	}
 	// end: for each input argument
 
@@ -444,12 +540,14 @@ parse_commandline(int argc, char **argv, bool use_uart, char *&uart_name, int &b
 //   Quit Signal Handler
 // ------------------------------------------------------------------------------
 // this function is called when you press Ctrl-C
-void
-quit_handler( int sig )
+void quit_handler( int sig )
 {
+#ifdef DEBUG
 	printf("\n");
 	printf("TERMINATING AT USER REQUEST\n");
 	printf("\n");
+#endif // DEBUG	
+	termination_requested = true;
 
 	// autopilot interface
 	try {
@@ -462,6 +560,31 @@ quit_handler( int sig )
 		port_quit->stop();
 	}
 	catch (int error){}
+
+	// end program here
+	exit(0);
+
+}
+void quit_handler_no_control(int sig)
+{
+#ifdef DEBUG
+	printf("\n");
+	printf("TERMINATING AT USER REQUEST\n");
+	printf("\n");
+#endif // DEBUG
+	termination_requested = true;
+
+	// autopilot interface
+	try {
+		autopilot_interface_quit->handle_quit_no_control(sig);
+	}
+	catch (int error) {}
+
+	// port
+	try {
+		port_quit->stop();
+	}
+	catch (int error) {}
 
 	// end program here
 	exit(0);

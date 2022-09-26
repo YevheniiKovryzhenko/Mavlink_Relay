@@ -56,6 +56,7 @@
 // ------------------------------------------------------------------------------
 
 #include "generic_port.h"
+#include "mocap_node.hpp"
 
 #include <signal.h>
 #include <time.h>
@@ -123,7 +124,6 @@
 
 
 // helper functions
-uint64_t get_time_usec();
 void set_position(float x, float y, float z, mavlink_set_position_target_local_ned_t &sp);
 void set_velocity(float vx, float vy, float vz, mavlink_set_position_target_local_ned_t &sp);
 void set_acceleration(float ax, float ay, float az, mavlink_set_position_target_local_ned_t &sp);
@@ -132,7 +132,8 @@ void set_yaw_rate(float yaw_rate, mavlink_set_position_target_local_ned_t &sp);
 
 void* start_autopilot_interface_read_thread(void *args);
 void* start_autopilot_interface_write_thread(void *args);
-
+void* start_autopilot_interface_write_vision_position_estimate_thread(void* args);
+void* start_autopilot_interface_printf_thread(void* args);
 
 // ------------------------------------------------------------------------------
 //   Data Structures
@@ -155,6 +156,7 @@ struct Time_Stamps
 	uint64_t position_target_global_int;
 	uint64_t highres_imu;
 	uint64_t attitude;
+	uint64_t vision_position_estimate;
 
 	void
 	reset_timestamps()
@@ -168,7 +170,8 @@ struct Time_Stamps
 		position_target_local_ned = 0;
 		position_target_global_int = 0;
 		highres_imu = 0;
-		attitude = 0;
+		attitude = 0;		
+		vision_position_estimate = 0;
 	}
 
 };
@@ -211,7 +214,10 @@ struct Mavlink_Messages {
 	// Attitude
 	mavlink_attitude_t attitude;
 
+	// Vision position and attitude estimate
+	mavlink_vision_position_estimate_t vision_position_estimate;
 	// System Parameters?
+	
 
 
 	// Time Stamps
@@ -249,9 +255,12 @@ class Autopilot_Interface
 public:
 
 	Autopilot_Interface();
-	Autopilot_Interface(Generic_Port *port_);
-	~Autopilot_Interface();
+	Autopilot_Interface(Generic_Port* port_);
+	Autopilot_Interface(Generic_Port* port_, std::string ip_addr_mocap_, int mocap_ID_);
+	~Autopilot_Interface();	
 
+	char printf_status;
+	char vision_position_writing_status;
 	char reading_status;
 	char writing_status;
 	char control_status;
@@ -259,7 +268,7 @@ public:
 
     int system_id;
 	int autopilot_id;
-	int companion_id;
+	int companion_id;	
 
 	Mavlink_Messages current_messages;
 	mavlink_set_position_target_local_ned_t initial_position;
@@ -269,19 +278,40 @@ public:
 	int  write_message(mavlink_message_t message);
 
 	int	 arm_disarm( bool flag );
-	void enable_offboard_control();
-	void disable_offboard_control();
+	void enable_offboard_control(void);
+	void disable_offboard_control(void);
 
-	void start();
-	void stop();
+	void start(void);
+	void stop(void);
 
-	void start_read_thread();
+	void enable_control(void);
+	void enable_telemetry(void);
+	void enable_vpe(void);
+	void enable_print_vpe(void);
+	void enable_print_control(void);
+	void enable_print_telemetry(void);
+
+	void start_vision_position_estimate_write_thread(void);
+	void start_read_thread(void);
 	void start_write_thread(void);
+	void start_printf_thread(void);
 
 	void handle_quit( int sig );
+	void handle_quit_no_control(int sig);
 
 
 private:
+	bool enable_vpe_fl = false;
+	bool enable_control_fl = false;
+	bool enable_telemetry_fl = true;
+	bool enable_printf_fl = false;
+	bool printf_vpe_fl = false;
+	bool printf_control_fl = false;
+	bool printf_telemetry_fl = false;
+
+	mocap_node_t mocap;
+	int mocap_ID;	
+	std::string ip_addr_mocap = "127.0.0.1";
 
 	Generic_Port *port;
 
@@ -289,18 +319,29 @@ private:
 
 	pthread_t read_tid;
 	pthread_t write_tid;
+	pthread_t vision_position_estimate_write_tid;
+	pthread_t printf_tid;
 
 	struct {
 		std::mutex mutex;
 		mavlink_set_position_target_local_ned_t data;
 	} current_setpoint;
 
+	struct {
+		std::mutex mutex;
+		mavlink_vision_position_estimate_t data;
+	} current_vision_position_estimate;
+
 	void read_thread();
 	void write_thread(void);
+	void vision_position_estimate_write_thread(void);
+	void printf_thread(void);
 
 	int toggle_offboard_control( bool flag );
 	void write_setpoint();
-
+	void write_vision_position_estimate();
+	void print_header(void);
+	void print_data(void);
 };
 
 

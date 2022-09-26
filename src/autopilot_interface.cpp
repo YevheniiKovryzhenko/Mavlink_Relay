@@ -54,17 +54,9 @@
 
 #include "autopilot_interface.h"
 
-
-// ----------------------------------------------------------------------------------
-//   Time
-// ------------------- ---------------------------------------------------------------
-uint64_t
-get_time_usec()
-{
-	static struct timeval _time_stamp;
-	gettimeofday(&_time_stamp, NULL);
-	return _time_stamp.tv_sec*1000000 + _time_stamp.tv_usec;
-}
+// terminal emulator control sequences
+#define WRAP_DISABLE	"\033[?7l"
+#define WRAP_ENABLE		"\033[?7h"
 
 
 // ----------------------------------------------------------------------------------
@@ -79,8 +71,7 @@ get_time_usec()
  * Modifies a mavlink_set_position_target_local_ned_t struct with target XYZ locations
  * in the Local NED frame, in meters.
  */
-void
-set_position(float x, float y, float z, mavlink_set_position_target_local_ned_t &sp)
+void set_position(float x, float y, float z, mavlink_set_position_target_local_ned_t &sp)
 {
 	sp.type_mask =
 		MAVLINK_MSG_SET_POSITION_TARGET_LOCAL_NED_POSITION;
@@ -125,8 +116,7 @@ set_velocity(float vx, float vy, float vz, mavlink_set_position_target_local_ned
  * Modifies a mavlink_set_position_target_local_ned_t struct with target AX AY AZ
  * accelerations in the Local NED frame, in meters per second squared.
  */
-void
-set_acceleration(float ax, float ay, float az, mavlink_set_position_target_local_ned_t &sp)
+void set_acceleration(float ax, float ay, float az, mavlink_set_position_target_local_ned_t &sp)
 {
 
 	// NOT IMPLEMENTED
@@ -154,8 +144,7 @@ set_acceleration(float ax, float ay, float az, mavlink_set_position_target_local
  * Modifies a mavlink_set_position_target_local_ned_t struct with a target yaw
  * in the Local NED frame, in radians.
  */
-void
-set_yaw(float yaw, mavlink_set_position_target_local_ned_t &sp)
+void set_yaw(float yaw, mavlink_set_position_target_local_ned_t &sp)
 {
 	sp.type_mask &=
 		MAVLINK_MSG_SET_POSITION_TARGET_LOCAL_NED_YAW_ANGLE ;
@@ -173,8 +162,7 @@ set_yaw(float yaw, mavlink_set_position_target_local_ned_t &sp)
  * Modifies a mavlink_set_position_target_local_ned_t struct with a target yaw rate
  * in the Local NED frame, in radians per second.
  */
-void
-set_yaw_rate(float yaw_rate, mavlink_set_position_target_local_ned_t &sp)
+void set_yaw_rate(float yaw_rate, mavlink_set_position_target_local_ned_t &sp)
 {
 	sp.type_mask &=
 		MAVLINK_MSG_SET_POSITION_TARGET_LOCAL_NED_YAW_RATE ;
@@ -194,8 +182,7 @@ set_yaw_rate(float yaw_rate, mavlink_set_position_target_local_ned_t &sp)
 // ------------------------------------------------------------------------------
 //   Con/De structors
 // ------------------------------------------------------------------------------
-Autopilot_Interface::
-Autopilot_Interface(Generic_Port *port_)
+Autopilot_Interface::Autopilot_Interface(Generic_Port *port_)
 {
 	// initialize attributes
 	write_count = 0;
@@ -216,32 +203,77 @@ Autopilot_Interface(Generic_Port *port_)
 	current_messages.compid = autopilot_id;
 
 	port = port_; // port management object
+}
+Autopilot_Interface::Autopilot_Interface(Generic_Port* port_, std::string ip_addr_mocap_, int mocap_ID_)
+{
+	// initialize attributes
+	write_count = 0;
 
+	reading_status = 0;      // whether the read thread is running
+	writing_status = 0;      // whether the write thread is running
+	control_status = 0;      // whether the autopilot is in offboard control mode
+	time_to_exit = false;  // flag to signal thread exit
+
+	read_tid = 0; // read thread id
+	write_tid = 0; // write thread id
+
+	system_id = 0; // system id
+	autopilot_id = 0; // autopilot component id
+	companion_id = 0; // companion computer component id
+
+	current_messages.sysid = system_id;
+	current_messages.compid = autopilot_id;
+
+	mocap_ID = mocap_ID_;
+	ip_addr_mocap = ip_addr_mocap_;
 }
 
-Autopilot_Interface::
-~Autopilot_Interface()
-{}
+Autopilot_Interface::~Autopilot_Interface(){}
 
+void Autopilot_Interface::enable_control(void)
+{
+	enable_control_fl = true;
+	return;
+}
+void Autopilot_Interface::enable_telemetry(void)
+{
+	enable_telemetry_fl = true;
+	return;
+}
+void Autopilot_Interface::enable_vpe(void)
+{
+	enable_vpe_fl = true;
+	return;
+}
+void Autopilot_Interface::enable_print_vpe(void)
+{
+	printf_vpe_fl = true;
+	return;
+}
+void Autopilot_Interface::enable_print_control(void)
+{
+	printf_control_fl = true;
+	return;
+}
+void Autopilot_Interface::enable_print_telemetry(void)
+{
+	printf_telemetry_fl = true;
+	return;
+}
 
 // ------------------------------------------------------------------------------
 //   Update Setpoint
 // ------------------------------------------------------------------------------
-void
-Autopilot_Interface::
-update_setpoint(mavlink_set_position_target_local_ned_t setpoint)
+void Autopilot_Interface::update_setpoint(mavlink_set_position_target_local_ned_t setpoint)
 {
 	std::lock_guard<std::mutex> lock(current_setpoint.mutex);
 	current_setpoint.data = setpoint;
 }
 
-
 // ------------------------------------------------------------------------------
 //   Read Messages
 // ------------------------------------------------------------------------------
-void
-Autopilot_Interface::
-read_messages()
+void Autopilot_Interface::read_messages(void)
 {
 	bool success;               // receive success flag
 	bool received_all = false;  // receive only one message
@@ -422,8 +454,7 @@ read_messages()
 //   Write Message
 // ------------------------------------------------------------------------------
 int
-Autopilot_Interface::
-write_message(mavlink_message_t message)
+Autopilot_Interface::write_message(mavlink_message_t message)
 {
 	// do the write
 	int len = port->write_message(message);
@@ -436,15 +467,56 @@ write_message(mavlink_message_t message)
 }
 
 // ------------------------------------------------------------------------------
-//   Write Setpoint Message
+//   Write Vision Position Estimate Message
 // ------------------------------------------------------------------------------
-void
-Autopilot_Interface::
-write_setpoint()
+void Autopilot_Interface::write_vision_position_estimate()
 {
 	// --------------------------------------------------------------------------
 	//   PACK PAYLOAD
 	// --------------------------------------------------------------------------
+
+	// pull from position target
+	mavlink_vision_position_estimate_t vpe;
+	{
+		std::lock_guard<std::mutex> lock(current_vision_position_estimate.mutex);
+		vpe = current_vision_position_estimate.data;
+	}
+
+	// double check some system parameters
+	if (not vpe.usec)
+		vpe.usec = get_time_usec();
+
+
+	// --------------------------------------------------------------------------
+	//   ENCODE
+	// --------------------------------------------------------------------------
+
+	mavlink_message_t message;
+	mavlink_msg_vision_position_estimate_encode(system_id, companion_id, &message, &vpe);
+
+	// --------------------------------------------------------------------------
+	//   WRITE
+	// --------------------------------------------------------------------------
+
+	// do the write
+	int len = write_message(message);
+
+	// check the write
+	if (len <= 0)
+		fprintf(stderr, "WARNING: could not send VISION_POSITION_ESTIMATE \n");
+
+	return;
+}
+
+// ------------------------------------------------------------------------------
+//   Write Setpoint Message
+// ------------------------------------------------------------------------------
+void Autopilot_Interface::write_setpoint(void)
+{
+	// --------------------------------------------------------------------------
+	//   PACK PAYLOAD
+	// --------------------------------------------------------------------------
+
 
 	// pull from position target
 	mavlink_set_position_target_local_ned_t sp;
@@ -478,8 +550,6 @@ write_setpoint()
 	// check the write
 	if ( len <= 0 )
 		fprintf(stderr,"WARNING: could not send POSITION_TARGET_LOCAL_NED \n");
-	//	else
-	//		printf("%lu POSITION_TARGET  = [ %f , %f , %f ] \n", write_count, position_target.x, position_target.y, position_target.z);
 
 	return;
 }
@@ -488,9 +558,7 @@ write_setpoint()
 // ------------------------------------------------------------------------------
 //   Start Off-Board Mode
 // ------------------------------------------------------------------------------
-void
-Autopilot_Interface::
-enable_offboard_control()
+void Autopilot_Interface::enable_offboard_control()
 {
 	// Should only send this command once
 	if ( control_status == false )
@@ -527,8 +595,7 @@ enable_offboard_control()
 //   Stop Off-Board Mode
 // ------------------------------------------------------------------------------
 void
-Autopilot_Interface::
-disable_offboard_control()
+Autopilot_Interface::disable_offboard_control()
 {
 
 	// Should only send this command once
@@ -565,8 +632,7 @@ disable_offboard_control()
 //   Arm
 // ------------------------------------------------------------------------------
 int
-Autopilot_Interface::
-arm_disarm( bool flag )
+Autopilot_Interface::arm_disarm( bool flag )
 {
 #ifdef DEBUG
 	if (flag)
@@ -603,8 +669,7 @@ arm_disarm( bool flag )
 //   Toggle Off-Board Mode
 // ------------------------------------------------------------------------------
 int
-Autopilot_Interface::
-toggle_offboard_control( bool flag )
+Autopilot_Interface::toggle_offboard_control( bool flag )
 {
 	// Prepare command for off-board mode
 	mavlink_command_long_t com = { 0 };
@@ -629,9 +694,7 @@ toggle_offboard_control( bool flag )
 // ------------------------------------------------------------------------------
 //   STARTUP
 // ------------------------------------------------------------------------------
-void
-Autopilot_Interface::
-start()
+void Autopilot_Interface::start(void)
 {
 	int result;
 
@@ -639,156 +702,218 @@ start()
 	//   CHECK PORT
 	// --------------------------------------------------------------------------
 
-	if ( !port->is_running() ) // PORT_OPEN
+	if (!port->is_running()) // PORT_OPEN
 	{
-		fprintf(stderr,"ERROR: port not open\n");
+		fprintf(stderr, "ERROR: port not open\n");
 		throw 1;
 	}
 
-
-	// --------------------------------------------------------------------------
-	//   READ THREAD
-	// --------------------------------------------------------------------------
-#ifdef DEBUG
-	printf("START READ THREAD \n");
-#endif // DEBUG
-	result = pthread_create( &read_tid, NULL, &start_autopilot_interface_read_thread, this );
-	if ( result ) throw result;
-
-	// now we're reading messages
-#ifdef DEBUG
-	printf("\n");
-#endif // DEBUG
-
-	// --------------------------------------------------------------------------
-	//   CHECK FOR MESSAGES
-	// --------------------------------------------------------------------------
-
-#ifdef DEBUG
-	printf("CHECK FOR MESSAGES\n");
-#endif // DEBUG
-
-	while ( not current_messages.sysid )
+	if (enable_vpe_fl)
 	{
-		if ( time_to_exit )
-			return;
-		usleep(500000); // check at 2Hz
-	}
-
+		// --------------------------------------------------------------------------
+		//   MOCAP READ THREAD
+		// --------------------------------------------------------------------------
 #ifdef DEBUG
-	printf("Found\n");
-
-	// now we know autopilot is sending messages
-	printf("\n");
-#endif // DEBUG
-
-	
-
-
-	// --------------------------------------------------------------------------
-	//   GET SYSTEM and COMPONENT IDs
-	// --------------------------------------------------------------------------
-
-	// This comes from the heartbeat, which in theory should only come from
-	// the autopilot we're directly connected to it.  If there is more than one
-	// vehicle then we can't expect to discover id's like this.
-	// In which case set the id's manually.
-
-	// System ID
-	if ( not system_id )
-	{
-		system_id = current_messages.sysid;
-		printf("GOT VEHICLE SYSTEM ID: %i\n", system_id );
-	}
-
-	// Component ID
-	if ( not autopilot_id )
-	{
-		autopilot_id = current_messages.compid;
-		printf("GOT AUTOPILOT COMPONENT ID: %i\n", autopilot_id);
-		printf("\n");
-	}
-
-
-	// --------------------------------------------------------------------------
-	//   GET INITIAL POSITION
-	// --------------------------------------------------------------------------
-
-	// Wait for initial position ned
-	while ( not ( current_messages.time_stamps.local_position_ned &&
-				  current_messages.time_stamps.attitude            )  )
-	{
-		if ( time_to_exit )
-			return;
-		usleep(500000);
-	}
-
-	// copy initial position ned
-	Mavlink_Messages local_data = current_messages;
-	initial_position.x        = local_data.local_position_ned.x;
-	initial_position.y        = local_data.local_position_ned.y;
-	initial_position.z        = local_data.local_position_ned.z;
-	initial_position.vx       = local_data.local_position_ned.vx;
-	initial_position.vy       = local_data.local_position_ned.vy;
-	initial_position.vz       = local_data.local_position_ned.vz;
-	initial_position.yaw      = local_data.attitude.yaw;
-	initial_position.yaw_rate = local_data.attitude.yawspeed;
-
-#ifdef DEBUG
-	printf("INITIAL POSITION XYZ = [ %.4f , %.4f , %.4f ] \n", initial_position.x, initial_position.y, initial_position.z);
-	printf("INITIAL POSITION YAW = %.4f \n", initial_position.yaw);
-	printf("\n");
+		printf("START MOCAP READ THREAD \n");
 #endif // DEBUG	
+		result = mocap.start(ip_addr_mocap);
+		if (result) throw result;
 
-	// we need this before starting the write thread
+		// now we're reading messages from mocap
+#ifdef DEBUG
+		printf("\n");
+#endif // DEBUG
+	}
 
+	if (enable_telemetry_fl)
+	{
+		// --------------------------------------------------------------------------
+		//   READ THREAD
+		// --------------------------------------------------------------------------
+#ifdef DEBUG
+		printf("START READ THREAD \n");
+#endif // DEBUG
+		result = pthread_create(&read_tid, NULL, &start_autopilot_interface_read_thread, this);
+		if (result) throw result;
+
+		// now we're reading messages
+#ifdef DEBUG
+		printf("\n");
+#endif // DEBUG
+	}
 
 	// --------------------------------------------------------------------------
-	//   WRITE THREAD
+	//   WRITE VISION POSITION ESTIMATE THREAD
 	// --------------------------------------------------------------------------
+	if (enable_vpe_fl)
+	{
 #ifdef DEBUG
-	printf("START WRITE THREAD \n");
+		printf("START VISION POSITION ESTIMATE WRITE THREAD \n");
 #endif // DEBUG
 
-	result = pthread_create( &write_tid, NULL, &start_autopilot_interface_write_thread, this );
-	if ( result ) throw result;
+		result = pthread_create(&vision_position_estimate_write_tid, NULL, &start_autopilot_interface_write_vision_position_estimate_thread, this);
+		if (result) throw result;
 
-	// wait for it to be started
-	while ( not writing_status )
-		usleep(100000); // 10Hz
-
-	// now we're streaming setpoint commands
+		// wait for it to be started
+		while (not vision_position_estimate_write_tid)
+			usleep(100000); // 10Hz		
 #ifdef DEBUG
-	printf("\n");
+		printf("\n");
 #endif // DEBUG
+	}
+
+	if (enable_telemetry_fl)
+	{
+		// --------------------------------------------------------------------------
+		//   CHECK FOR MESSAGES
+		// --------------------------------------------------------------------------
+
+#ifdef DEBUG
+		printf("CHECK FOR MESSAGES\n");
+#endif // DEBUG
+
+		while (not current_messages.sysid)
+		{
+			if (time_to_exit)
+				return;
+			usleep(500000); // check at 2Hz
+		}
+
+#ifdef DEBUG
+		printf("Found\n");
+
+		// now we know autopilot is sending messages
+		printf("\n");
+#endif // DEBUG
+
+		// --------------------------------------------------------------------------
+		//   GET SYSTEM and COMPONENT IDs
+		// --------------------------------------------------------------------------
+
+		// This comes from the heartbeat, which in theory should only come from
+		// the autopilot we're directly connected to it.  If there is more than one
+		// vehicle then we can't expect to discover id's like this.
+		// In which case set the id's manually.
+
+		// System ID
+		if (not system_id)
+		{
+			system_id = current_messages.sysid;
+			printf("GOT VEHICLE SYSTEM ID: %i\n", system_id);
+		}
+
+		// Component ID
+		if (not autopilot_id)
+		{
+			autopilot_id = current_messages.compid;
+			printf("GOT AUTOPILOT COMPONENT ID: %i\n", autopilot_id);
+			printf("\n");
+		}
+
+
+		// --------------------------------------------------------------------------
+		//   GET INITIAL POSITION
+		// --------------------------------------------------------------------------
+
+		// Wait for initial position ned
+		while (not (current_messages.time_stamps.local_position_ned &&
+			current_messages.time_stamps.attitude))
+		{
+			if (time_to_exit)
+				return;
+			usleep(500000);
+		}
+
+		// copy initial position ned
+		Mavlink_Messages local_data = current_messages;
+		initial_position.x = local_data.local_position_ned.x;
+		initial_position.y = local_data.local_position_ned.y;
+		initial_position.z = local_data.local_position_ned.z;
+		initial_position.vx = local_data.local_position_ned.vx;
+		initial_position.vy = local_data.local_position_ned.vy;
+		initial_position.vz = local_data.local_position_ned.vz;
+		initial_position.yaw = local_data.attitude.yaw;
+		initial_position.yaw_rate = local_data.attitude.yawspeed;
+
+#ifdef DEBUG
+		printf("INITIAL POSITION XYZ = [ %.4f , %.4f , %.4f ] \n", initial_position.x, initial_position.y, initial_position.z);
+		printf("INITIAL POSITION YAW = %.4f \n", initial_position.yaw);
+		printf("\n");
+#endif // DEBUG	
+	}
+
+	if (!enable_control_fl)
+	{
+		// --------------------------------------------------------------------------
+		//   WRITE THREAD
+		// --------------------------------------------------------------------------
+#ifdef DEBUG
+		printf("START WRITE THREAD \n");
+#endif // DEBUG
+
+		result = pthread_create(&write_tid, NULL, &start_autopilot_interface_write_thread, this);
+		if (result) throw result;
+
+		// wait for it to be started
+		while (not writing_status)
+			usleep(100000); // 10Hz
+
+		// now we're streaming setpoint commands
+#ifdef DEBUG
+		printf("\n");
+#endif // DEBUG
+	}
+
+	if (enable_printf_fl)
+	{
+#ifdef DEBUG
+		printf("START PRINTF THREAD \n");
+#endif // DEBUG
+
+		result = pthread_create(&write_tid, NULL, &start_autopilot_interface_write_thread, this);
+		if (result) throw result;
+
+		// wait for it to be started
+		while (not printf_status)
+			usleep(100000); // 10Hz
+
+		// now we're streaming setpoint commands
+#ifdef DEBUG
+		printf("\n");
+#endif // DEBUG
+	}
 
 	// Done!
 	return;
 
 }
 
-
 // ------------------------------------------------------------------------------
 //   SHUTDOWN
 // ------------------------------------------------------------------------------
-void
-Autopilot_Interface::
-stop()
+void Autopilot_Interface::stop(void)
 {
 	// --------------------------------------------------------------------------
 	//   CLOSE THREADS
 	// --------------------------------------------------------------------------
+#ifdef DEBUG
 	printf("CLOSE THREADS\n");
+#endif // DEBUG
 
 	// signal exit
 	time_to_exit = true;
 
-	// wait for exit
+	// wait for exit	
+	pthread_join(vision_position_estimate_write_tid, NULL);
 	pthread_join(read_tid ,NULL);
 	pthread_join(write_tid,NULL);
+	pthread_join(printf_tid, NULL);
+	mocap.stop();
 
 	// now the read and write threads are closed
+#ifdef DEBUG
 	printf("\n");
+#endif // DEBUG
 
 	// still need to close the port separately
 }
@@ -796,14 +921,12 @@ stop()
 // ------------------------------------------------------------------------------
 //   Read Thread
 // ------------------------------------------------------------------------------
-void
-Autopilot_Interface::
-start_read_thread()
+void Autopilot_Interface::start_read_thread(void)
 {
 
 	if ( reading_status != 0 )
 	{
-		fprintf(stderr,"read thread already running\n");
+		fprintf(stderr,"ERROR in start_read_thread: thread already running\n");
 		return;
 	}
 	else
@@ -818,13 +941,11 @@ start_read_thread()
 // ------------------------------------------------------------------------------
 //   Write Thread
 // ------------------------------------------------------------------------------
-void
-Autopilot_Interface::
-start_write_thread(void)
+void Autopilot_Interface::start_write_thread(void)
 {
 	if ( not writing_status == false )
 	{
-		fprintf(stderr,"write thread already running\n");
+		fprintf(stderr,"ERROR in start_write_thread: thread already running\n");
 		return;
 	}
 
@@ -836,13 +957,49 @@ start_write_thread(void)
 
 }
 
+// ------------------------------------------------------------------------------
+//   Printf Thread
+// ------------------------------------------------------------------------------
+void Autopilot_Interface::start_printf_thread(void)
+{
+	if (not printf_status == false)
+	{
+		fprintf(stderr, "ERROR in start_printf_thread: thread already running\n");
+		return;
+	}
+
+	else
+	{
+		printf_thread();
+		return;
+	}
+
+}
+
+// ------------------------------------------------------------------------------
+//   Vision Position Estimate Write Thread
+// ------------------------------------------------------------------------------
+void Autopilot_Interface::start_vision_position_estimate_write_thread(void)
+{
+	if (not vision_position_writing_status == false)
+	{
+		fprintf(stderr, "ERROR in start_vision_position_estimate_write_thread: thread already running\n");
+		return;
+	}
+
+	else
+	{
+		vision_position_estimate_write_thread();
+		return;
+	}
+
+}
+
 
 // ------------------------------------------------------------------------------
 //   Quit Handler
 // ------------------------------------------------------------------------------
-void
-Autopilot_Interface::
-handle_quit( int sig )
+void Autopilot_Interface::handle_quit( int sig )
 {
 
 	disable_offboard_control();
@@ -856,15 +1013,148 @@ handle_quit( int sig )
 	}
 
 }
+void Autopilot_Interface::handle_quit_no_control(int sig)
+{
 
+	try {
+		stop();
+
+	}
+	catch (int error) {
+		fprintf(stderr, "Warning, could not stop autopilot interface\n");
+	}
+
+}
+
+
+// ------------------------------------------------------------------------------
+//   Printf
+// ------------------------------------------------------------------------------
+#define PRINTF_DATA_WIDTH 10
+#define PRINT_HEADER(in) __print_header(#in, PRINTF_DATA_WIDTH)
+#define PRINT_DATA(in) __print_data_float(in, PRINTF_DATA_WIDTH)
+
+void __print_header(const char* in, int size)
+{
+	char tmp[100];
+	sprintf(tmp, " %s%i%s |", "%", size, "s");
+	printf(tmp,in);
+}
+void __print_data_float(double in, int size)
+{
+	char tmp[100];
+	sprintf(tmp, " %s%i.3%s |", "%", size, "f");
+	printf(tmp, in);
+}
+void Autopilot_Interface::print_header(void)
+{
+	printf("\n| ");	
+	if (enable_vpe_fl && printf_vpe_fl)
+	{
+		PRINT_HEADER(vpe.usec);
+		PRINT_HEADER(vpe.roll);
+		PRINT_HEADER(vpe.pitch);
+		PRINT_HEADER(vpe.yaw);
+		PRINT_HEADER(vpe.x);
+		PRINT_HEADER(vpe.y);
+		PRINT_HEADER(vpe.z);
+	}
+	if (enable_control_fl && printf_control_fl)
+	{
+		PRINT_HEADER(sp.x);
+		PRINT_HEADER(sp.y);
+		PRINT_HEADER(sp.z);
+		PRINT_HEADER(sp.vx);
+		PRINT_HEADER(sp.vy);
+		PRINT_HEADER(sp.vz);
+		PRINT_HEADER(sp.yaw);
+		PRINT_HEADER(sp.yaw_rate);
+	}
+	if (enable_telemetry_fl && printf_telemetry_fl)
+	{
+		PRINT_HEADER(mav.roll);
+		PRINT_HEADER(mav.pitch);
+		PRINT_HEADER(mav.yaw);
+		PRINT_HEADER(mav.x);
+		PRINT_HEADER(mav.y);
+		PRINT_HEADER(mav.z);
+	}
+
+	printf("\n");
+	fflush(stdout);
+	return;
+}
+void Autopilot_Interface::print_data(void)
+{
+	// make a local copy of all the data
+	mavlink_vision_position_estimate_t vpe;
+	mavlink_set_position_target_local_ned_t sp;
+	Mavlink_Messages mav;
+	if (enable_vpe_fl && printf_vpe_fl)
+	{
+		{
+			std::lock_guard<std::mutex> lock(current_vision_position_estimate.mutex);
+			vpe = current_vision_position_estimate.data;
+		}
+	}
+	if (enable_control_fl && printf_control_fl)
+	{
+		{
+			std::lock_guard<std::mutex> lock(current_setpoint.mutex);
+			sp = current_setpoint.data;
+		}
+	}
+	if (enable_telemetry_fl && printf_telemetry_fl)
+	{
+		mav = current_messages;
+	}
+
+	//print data
+	// turn off linewrap to avoid runaway prints
+	printf(WRAP_DISABLE);
+	if (enable_vpe_fl && printf_vpe_fl)
+	{
+		PRINT_DATA(vpe.usec);
+		PRINT_DATA(vpe.roll);
+		PRINT_DATA(vpe.pitch);
+		PRINT_DATA(vpe.yaw);
+		PRINT_DATA(vpe.x);
+		PRINT_DATA(vpe.y);
+		PRINT_DATA(vpe.z);
+	}
+	if (enable_control_fl && printf_control_fl)
+	{
+		PRINT_DATA(sp.x);
+		PRINT_DATA(sp.y);
+		PRINT_DATA(sp.z);
+		PRINT_DATA(sp.vx);
+		PRINT_DATA(sp.vy);
+		PRINT_DATA(sp.vz);
+		PRINT_DATA(sp.yaw);
+		PRINT_DATA(sp.yaw_rate);
+	}
+	if (enable_telemetry_fl && printf_telemetry_fl)
+	{
+		PRINT_DATA(mav.attitude.roll);
+		PRINT_DATA(mav.attitude.pitch);
+		PRINT_DATA(mav.attitude.yaw);
+		PRINT_DATA(mav.local_position_ned.x);
+		PRINT_DATA(mav.local_position_ned.y);
+		PRINT_DATA(mav.local_position_ned.z);
+
+	}
+
+	fflush(stdout);
+	// put linewrap back on
+	printf(WRAP_ENABLE);
+	return;
+}
 
 
 // ------------------------------------------------------------------------------
 //   Read Thread
 // ------------------------------------------------------------------------------
-void
-Autopilot_Interface::
-read_thread()
+void Autopilot_Interface::read_thread(void)
 {
 	reading_status = true;
 
@@ -880,12 +1170,113 @@ read_thread()
 }
 
 
+
+void __copy_data(mavlink_vision_position_estimate_t& buff_out, mocap_data_t& buff_in)
+{
+	buff_out.usec = buff_in.time_us;
+	buff_out.x = buff_in.x;
+	buff_out.y = buff_in.y;
+	buff_out.z = buff_in.z;
+	buff_out.roll = buff_in.roll;
+	buff_out.pitch = buff_in.pitch;
+	buff_out.yaw = buff_in.yaw;
+	return;
+}
+
+bool __is_vision_data_same(mavlink_vision_position_estimate_t& in1, mavlink_vision_position_estimate_t& in2)
+{
+	if (in1.usec == in2.usec) return true;
+	if (in1.x == in2.x) return true;
+	if (in1.y == in2.y) return true;
+	if (in1.z == in2.z) return true;
+	if (in1.yaw == in2.yaw) return true;
+	if (in1.roll == in2.roll) return true;
+	if (in1.pitch == in2.pitch) return true;
+	return false;
+}
+
+bool __update_from_mocap(mavlink_vision_position_estimate_t& buff_out, int mocap_ID, mocap_node_t& node)
+{
+	bool data_is_good = false;
+	
+	//get the data from mocap
+	mocap_data_t tmp;	
+	node.get_data(tmp, mocap_ID);
+	if (tmp.trackingValid) //check if tracking was done properly
+	{
+		mavlink_vision_position_estimate_t tmp_2;
+		__copy_data(tmp_2, tmp);
+		if (!__is_vision_data_same(tmp_2, buff_out))
+		{
+			__copy_data(buff_out, tmp);
+			data_is_good = true;
+		}
+#ifdef DEBUG
+		else
+		{
+			printf("WARNING in __update_from_mocap: no new update\n");
+		}
+#endif // DEBUG		
+	}
+	
+	return data_is_good;
+}
+
+// ------------------------------------------------------------------------------
+//   vision_position_estimate (MOCAP) Write Thread
+// ------------------------------------------------------------------------------
+void Autopilot_Interface::vision_position_estimate_write_thread(void)
+{
+	// signal startup
+	vision_position_writing_status = 2;
+
+	// prepare an initial setpoint, just stay put
+	mavlink_vision_position_estimate_t vpe;
+	vpe.covariance[0] = NAN;
+
+	// set vision position estimate
+	{
+		std::lock_guard<std::mutex> lock(current_vision_position_estimate.mutex);
+		current_vision_position_estimate.data = vpe;
+
+		//get the data from mocap
+		while (!__update_from_mocap(current_vision_position_estimate.data, mocap_ID, mocap));
+	}	
+
+	// write a message and signal writing
+	write_vision_position_estimate();
+	vision_position_writing_status = true;
+	usleep(20000);   // Stream at 50Hz
+
+	//The messages should be streamed at between 30Hz(if containing covariances) and 50 Hz.
+	//If the message rate is too low, EKF2 will not fuse the external vision messages.
+	bool tmp = false;
+	while (!time_to_exit)
+	{
+		tmp = false;
+		{
+			std::lock_guard<std::mutex> lock(current_vision_position_estimate.mutex);
+			tmp = __update_from_mocap(current_vision_position_estimate.data, mocap_ID, mocap);
+		}
+		if (tmp)
+		{
+			write_vision_position_estimate();
+			usleep(20000);   // Stream at 50Hz
+		}		
+	}
+
+	// signal end
+	vision_position_writing_status = false;
+
+	return;
+
+}
+
+
 // ------------------------------------------------------------------------------
 //   Write Thread
 // ------------------------------------------------------------------------------
-void
-Autopilot_Interface::
-write_thread(void)
+void Autopilot_Interface::write_thread(void)
 {
 	// signal startup
 	writing_status = 2;
@@ -925,6 +1316,28 @@ write_thread(void)
 
 }
 
+
+// ------------------------------------------------------------------------------
+//   Printf Thread
+// ------------------------------------------------------------------------------
+void Autopilot_Interface::printf_thread(void)
+{
+	// signal startup
+	printf_status = 2;
+
+	print_header(); //stat by printing a header
+	
+	printf_status = true;
+	while (!time_to_exit)
+	{
+		usleep(100000);   // Print at 10Hz
+		print_data();
+	}
+	printf_status = false;
+	return;
+
+}
+
 // End Autopilot_Interface
 
 
@@ -932,8 +1345,7 @@ write_thread(void)
 //  Pthread Starter Helper Functions
 // ------------------------------------------------------------------------------
 
-void*
-start_autopilot_interface_read_thread(void *args)
+void* start_autopilot_interface_read_thread(void *args)
 {
 	// takes an autopilot object argument
 	Autopilot_Interface *autopilot_interface = (Autopilot_Interface *)args;
@@ -945,8 +1357,7 @@ start_autopilot_interface_read_thread(void *args)
 	return NULL;
 }
 
-void*
-start_autopilot_interface_write_thread(void *args)
+void* start_autopilot_interface_write_thread(void *args)
 {
 	// takes an autopilot object argument
 	Autopilot_Interface *autopilot_interface = (Autopilot_Interface *)args;
@@ -958,5 +1369,29 @@ start_autopilot_interface_write_thread(void *args)
 	return NULL;
 }
 
+void* start_autopilot_interface_write_vision_position_estimate_thread(void* args)
+{
+	// takes an autopilot object argument
+	Autopilot_Interface* autopilot_interface = (Autopilot_Interface*)args;
+
+	// run the object's read thread
+	autopilot_interface->start_vision_position_estimate_write_thread();
+
+	// done!
+	return NULL;
+}
+
+
+void* start_autopilot_interface_printf_thread(void* args)
+{
+	// takes an autopilot object argument
+	Autopilot_Interface* autopilot_interface = (Autopilot_Interface*)args;
+
+	// run the object's printf thread
+	autopilot_interface->start_printf_thread();
+
+	// done!
+	return NULL;
+}
 
 

@@ -81,12 +81,14 @@ int main(int argc, char **argv);
 int top(int argc, char **argv);
 
 void commands(Autopilot_Interface &autopilot_interface, bool autotakeoff);
-void parse_commandline(int argc, char** argv, bool use_uart, char*& uart_name, int& baudrate,
-	bool& use_udp, char*& udp_ip, int& udp_port, bool& autotakeoff,
-	bool& use_mocap, char*& mocap_ip);
+void parse_commandline(int argc, char** argv, bool use_uart, char*& uart_name, int& baudrate, \
+	bool& use_udp, char*& udp_ip, int& udp_port, bool& autotakeoff, \
+	bool& enable_mocap, char*& mocap_ip, int& mocap_ID, bool& enable_control, \
+	bool& print_control, bool& print_telemetry, bool& print_vpe);
 
 // quit handler
 Autopilot_Interface *autopilot_interface_quit;
 Generic_Port *port_quit;
 void quit_handler( int sig );
+void quit_handler_no_control(int sig);
 
