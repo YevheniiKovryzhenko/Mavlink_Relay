@@ -310,6 +310,8 @@ private:
 	bool printf_control_fl = false;
 	bool printf_telemetry_fl = false;
 
+	Time_Stamps time_stamps_old;
+
 	mocap_node_t mocap;
 	int mocap_ID;	
 	std::string ip_addr_mocap = "127.0.0.1";
@@ -326,11 +328,13 @@ private:
 	struct {
 		std::mutex mutex;
 		mavlink_set_position_target_local_ned_t data;
+		uint64_t time_ms_old;
 	} current_setpoint;
 
 	struct {
 		std::mutex mutex;
 		mavlink_vision_position_estimate_t data;
+		uint64_t time_us_old;
 	} current_vision_position_estimate;
 
 	void read_thread();

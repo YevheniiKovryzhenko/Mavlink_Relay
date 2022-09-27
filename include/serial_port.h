@@ -65,6 +65,7 @@
 #include <common/mavlink.h>
 
 #include "generic_port.h"
+#include "serialib.h"
 
 // ------------------------------------------------------------------------------
 //   Defines
@@ -72,6 +73,7 @@
 
 // The following two non-standard baudrates should have been defined by the system
 // If not, just fallback to number
+/*
 #ifndef B460800
 #define B460800 460800
 #endif
@@ -79,7 +81,7 @@
 #ifndef B921600
 #define B921600 921600
 #endif
-
+*/
 // ------------------------------------------------------------------------------
 //   Prototypes
 // ------------------------------------------------------------------------------
@@ -119,8 +121,9 @@ public:
 	void stop();
 
 private:
+	serialib serial;
 
-	int  fd;
+	//int  fd;
 	mavlink_status_t lastStatus;
 	pthread_mutex_t  lock;
 
@@ -131,8 +134,8 @@ private:
 	int  baudrate;
 	bool is_open;
 
-	int  _open_port(const char* port);
-	bool _setup_port(int baud, int data_bits, int stop_bits, bool parity, bool hardware_control);
+	//int  _open_port(const char* port);
+	//bool _setup_port(int baud, int data_bits, int stop_bits, bool parity, bool hardware_control);
 	int  _read_port(uint8_t &cp);
 	int _write_port(char *buf, unsigned len);
 

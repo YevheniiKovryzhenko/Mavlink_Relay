@@ -30,7 +30,7 @@
 #include "optitrack_channels.h"
 #include "optitrack.hpp"
 
-#define DEBUG
+//#define DEBUG
 
 void __copy_data(mocap_data_t& buff_out, mocap_data_t& buff_in)
 {
@@ -253,7 +253,7 @@ char mocap_node_t::init(std::string ip_addr)
     }
     else {
         fprintf(stderr,
-            "ERROR in open: successfully created socket for ip address "
+            "Successfully created socket for ip address "
             "%s:%d\n",
             ip_addr.c_str(), PORT_DATA);
     }

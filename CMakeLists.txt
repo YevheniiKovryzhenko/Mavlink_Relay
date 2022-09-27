@@ -25,6 +25,7 @@ target_include_directories(Mavlink_Relay PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src
 # Link all the outside libraries used in this project (from libs folder):
 target_link_libraries(Mavlink_Relay PUBLIC mavlink)
 target_link_libraries(Mavlink_Relay PUBLIC optitrack)
+target_link_libraries(Mavlink_Relay PUBLIC Serial_Tools_lib)
 
 # This forces to use threads library:
 set(THREADS_PREFER_PTHREAD_FLAG ON)

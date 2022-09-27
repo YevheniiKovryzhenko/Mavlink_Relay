@@ -54,7 +54,7 @@
 // ------------------------------------------------------------------------------
 
 #include "mavlink_control.h"
-#define DEBUG
+//#define DEBUG
 
 bool termination_requested = false;
 
@@ -200,6 +200,10 @@ top (int argc, char **argv)
 #endif // DEBUG
 	autopilot_interface.enable_telemetry();
 	if (print_telemetry) autopilot_interface.enable_print_telemetry();
+
+#ifdef DEBUG
+	printf("Enabling printing...\n");
+#endif // DEBUG
 
 	/*
 	* Start the port and autopilot_interface
