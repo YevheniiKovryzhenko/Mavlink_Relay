@@ -64,6 +64,7 @@
 #include <pthread.h> // This uses POSIX Threads
 #include <unistd.h>  // UNIX standard function definitions
 #include <mutex>
+#include "thread_gen.hpp"
 
 #include <common/mavlink.h>
 
@@ -317,10 +318,10 @@ private:
 
 	bool time_to_exit;
 
-	pthread_t read_tid;
-	pthread_t write_tid;
-	pthread_t vision_position_estimate_write_tid;
-	pthread_t printf_tid;
+	thread_gen_t read_tid;
+	thread_gen_t write_tid;
+	thread_gen_t vision_position_estimate_write_tid;
+	thread_gen_t printf_tid;
 
 	struct {
 		std::mutex mutex;

@@ -54,6 +54,7 @@
 // ------------------------------------------------------------------------------
 
 #include "mavlink_control.h"
+#define DEBUG
 
 bool termination_requested = false;
 
@@ -170,20 +171,33 @@ top (int argc, char **argv)
 		autopilot_interface_quit = &autopilot_interface;
 		signal(SIGINT, quit_handler_no_control);
 
-	}		
+	}
+#ifdef DEBUG
+	printf("quit handler started\n");
+#endif // DEBUG
+
 
 	if (enable_mocap) //for now don't do control
 	{
+#ifdef DEBUG
+		printf("Enabling mocap...\n");
+#endif // DEBUG
 		autopilot_interface.enable_vpe();
 		if (print_vpe) autopilot_interface.enable_print_vpe();
 	}
 
 	if (enable_control)
 	{
+#ifdef DEBUG
+		printf("Enabling control...\n");
+#endif // DEBUG
 		autopilot_interface.enable_control();
 		if (print_control) autopilot_interface.enable_print_control();
 	}
 
+#ifdef DEBUG
+	printf("Enabling telemetry...\n");
+#endif // DEBUG
 	autopilot_interface.enable_telemetry();
 	if (print_telemetry) autopilot_interface.enable_print_telemetry();
 
@@ -191,11 +205,20 @@ top (int argc, char **argv)
 	* Start the port and autopilot_interface
 	* This is where the port is opened, and read and write threads are started.
 	*/
+#ifdef DEBUG
+	printf("Starting port...\n");
+#endif // DEBUG
 	port->start();
+#ifdef DEBUG
+	printf("Starting autopilot interface...\n");
+#endif // DEBUG
 	autopilot_interface.start();
 
 	if (enable_control)
 	{
+#ifdef DEBUG
+		printf("Running commands port...\n");
+#endif // DEBUG
 		// --------------------------------------------------------------------------
 		//   RUN COMMANDS
 		// --------------------------------------------------------------------------
@@ -218,6 +241,9 @@ top (int argc, char **argv)
 	/*
 	* Now that we are done we can stop the threads and close the port
 	*/
+#ifdef DEBUG
+	printf("Terminating...\n");
+#endif // DEBUG
 	autopilot_interface.stop();
 	port->stop();
 

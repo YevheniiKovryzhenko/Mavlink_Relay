@@ -30,6 +30,8 @@
 #include "optitrack_channels.h"
 #include "optitrack.hpp"
 
+#define DEBUG
+
 void __copy_data(mocap_data_t& buff_out, mocap_data_t& buff_in)
 {
     buff_out.id = buff_in.id;
@@ -134,11 +136,19 @@ char mocap_node_t::start(std::string ip_addr)
 {
     if (init(ip_addr) < 0)
     {
+        printf("ERROR in start: failed to initialize ip\n");
         stop();
         return -1;
     }
-    if (pthread_create(&read_tid, NULL, &start_mocap_read_thread, this))
+    if (thread.init(0, OTHER))
     {
+        printf("ERROR in start: failed to initialize thread\n");
+        stop();
+        return -1;
+    }
+    if (thread.start(&start_mocap_read_thread, this))
+    {
+        printf("ERROR in start: failed to start thread\n");
         stop();
         return -1;
     }
@@ -151,15 +161,22 @@ char mocap_node_t::start(std::string ip_addr)
 // ------------------------------------------------------------------------------
 char mocap_node_t::stop(void)
 {
+#ifdef DEBUG
+    printf("Terminating mocap note thread\n");
+#endif // DEBUG
+
     // signal exit
     time_to_exit = true;
 
-    // wait for exit	
-    pthread_join(read_tid, NULL);
+    // wait for exit
+    thread.stop(2.0);
+    //pthread_join(read_tid, NULL);
 
     // destroy mutex
     pthread_mutex_destroy(&lock);
-
+#ifdef DEBUG
+    printf("Done terminating mocap note thread\n");
+#endif // DEBUG
     return 0;
 }
 
@@ -168,7 +185,6 @@ char mocap_node_t::stop(void)
 // ------------------------------------------------------------------------------
 void mocap_node_t::start_read_thread()
 {
-
     if (reading_status != 0)
     {
         fprintf(stderr, "ERROR in start_read_thread: mocap reading thread is already running\n");

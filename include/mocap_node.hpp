@@ -5,6 +5,7 @@
 #include <sys/socket.h> // for sockaddr
 #include <mutex>
 #include "optitrack.hpp"
+#include "thread_gen.hpp"
 
 uint64_t get_time_usec();
 
@@ -37,7 +38,7 @@ public:
 private:
 	uint64_t time_us;
 	pthread_mutex_t  lock;
-	pthread_t read_tid;
+	thread_gen_t thread;
 	bool time_to_exit;
 
 	const static int BUFF_LEN = 20000;

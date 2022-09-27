@@ -58,6 +58,8 @@
 #define WRAP_DISABLE	"\033[?7l"
 #define WRAP_ENABLE		"\033[?7h"
 
+#define DEBUG
+
 
 // ----------------------------------------------------------------------------------
 //   Setpoint Helper Functions
@@ -192,8 +194,11 @@ Autopilot_Interface::Autopilot_Interface(Generic_Port *port_)
 	control_status = 0;      // whether the autopilot is in offboard control mode
 	time_to_exit   = false;  // flag to signal thread exit
 
-	read_tid  = 0; // read thread id
-	write_tid = 0; // write thread id
+	// init threads
+	read_tid.init(0,OTHER);
+	write_tid.init(0, OTHER);
+	vision_position_estimate_write_tid.init(0, OTHER);
+	printf_tid.init(0, OTHER);
 
 	system_id    = 0; // system id
 	autopilot_id = 0; // autopilot component id
@@ -214,8 +219,10 @@ Autopilot_Interface::Autopilot_Interface(Generic_Port* port_, std::string ip_add
 	control_status = 0;      // whether the autopilot is in offboard control mode
 	time_to_exit = false;  // flag to signal thread exit
 
-	read_tid = 0; // read thread id
-	write_tid = 0; // write thread id
+	read_tid.init(0, OTHER);
+	write_tid.init(0, OTHER);
+	vision_position_estimate_write_tid.init(0, OTHER);
+	printf_tid.init(0, OTHER);
 
 	system_id = 0; // system id
 	autopilot_id = 0; // autopilot component id
@@ -224,6 +231,7 @@ Autopilot_Interface::Autopilot_Interface(Generic_Port* port_, std::string ip_add
 	current_messages.sysid = system_id;
 	current_messages.compid = autopilot_id;
 
+	port = port_; // port management object
 	mocap_ID = mocap_ID_;
 	ip_addr_mocap = ip_addr_mocap_;
 }
@@ -690,26 +698,40 @@ Autopilot_Interface::toggle_offboard_control( bool flag )
 	return len;
 }
 
-
 // ------------------------------------------------------------------------------
 //   STARTUP
 // ------------------------------------------------------------------------------
 void Autopilot_Interface::start(void)
 {
 	int result;
+#ifdef DEBUG
+	printf("trying to start autopilot interface...\n");
+#endif // DEBUG
+
 
 	// --------------------------------------------------------------------------
 	//   CHECK PORT
 	// --------------------------------------------------------------------------
 
+#ifdef DEBUG
+	printf("Checking if port is running...\n");
+#endif // DEBUG
 	if (!port->is_running()) // PORT_OPEN
 	{
 		fprintf(stderr, "ERROR: port not open\n");
 		throw 1;
 	}
-
+#ifdef DEBUG
+	printf("Good.\n");
+#endif // DEBUG
+#ifdef DEBUG
+	printf("Check if vpe is enabled\n");
+#endif // DEBUG
 	if (enable_vpe_fl)
 	{
+#ifdef DEBUG
+		printf("VPE is enabled, starting...\n");
+#endif // DEBUG
 		// --------------------------------------------------------------------------
 		//   MOCAP READ THREAD
 		// --------------------------------------------------------------------------
@@ -724,16 +746,21 @@ void Autopilot_Interface::start(void)
 		printf("\n");
 #endif // DEBUG
 	}
-
+#ifdef DEBUG
+	printf("Check if telemetry is enabled\n");
+#endif // DEBUG
 	if (enable_telemetry_fl)
 	{
+#ifdef DEBUG
+		printf("Telemetry is enabled, starting...\n");
+#endif // DEBUG
 		// --------------------------------------------------------------------------
 		//   READ THREAD
 		// --------------------------------------------------------------------------
 #ifdef DEBUG
 		printf("START READ THREAD \n");
 #endif // DEBUG
-		result = pthread_create(&read_tid, NULL, &start_autopilot_interface_read_thread, this);
+		result = read_tid.start(&start_autopilot_interface_read_thread, this);
 		if (result) throw result;
 
 		// now we're reading messages
@@ -751,17 +778,17 @@ void Autopilot_Interface::start(void)
 		printf("START VISION POSITION ESTIMATE WRITE THREAD \n");
 #endif // DEBUG
 
-		result = pthread_create(&vision_position_estimate_write_tid, NULL, &start_autopilot_interface_write_vision_position_estimate_thread, this);
+		result = vision_position_estimate_write_tid.start(&start_autopilot_interface_write_vision_position_estimate_thread, this);
 		if (result) throw result;
 
-		// wait for it to be started
-		while (not vision_position_estimate_write_tid)
-			usleep(100000); // 10Hz		
 #ifdef DEBUG
 		printf("\n");
 #endif // DEBUG
 	}
 
+#ifdef DEBUG
+	printf("Check if telemetry is enabled\n");
+#endif // DEBUG
 	if (enable_telemetry_fl)
 	{
 		// --------------------------------------------------------------------------
@@ -842,6 +869,9 @@ void Autopilot_Interface::start(void)
 #endif // DEBUG	
 	}
 
+#ifdef DEBUG
+	printf("Check if control is enabled\n");
+#endif // DEBUG
 	if (!enable_control_fl)
 	{
 		// --------------------------------------------------------------------------
@@ -851,12 +881,8 @@ void Autopilot_Interface::start(void)
 		printf("START WRITE THREAD \n");
 #endif // DEBUG
 
-		result = pthread_create(&write_tid, NULL, &start_autopilot_interface_write_thread, this);
+		result = write_tid.start(&start_autopilot_interface_write_thread, this);
 		if (result) throw result;
-
-		// wait for it to be started
-		while (not writing_status)
-			usleep(100000); // 10Hz
 
 		// now we're streaming setpoint commands
 #ifdef DEBUG
@@ -864,18 +890,17 @@ void Autopilot_Interface::start(void)
 #endif // DEBUG
 	}
 
+#ifdef DEBUG
+	printf("Check if printing is enabled\n");
+#endif // DEBUG
 	if (enable_printf_fl)
 	{
 #ifdef DEBUG
 		printf("START PRINTF THREAD \n");
 #endif // DEBUG
 
-		result = pthread_create(&write_tid, NULL, &start_autopilot_interface_write_thread, this);
+		result = printf_tid.start(&start_autopilot_interface_printf_thread, this);
 		if (result) throw result;
-
-		// wait for it to be started
-		while (not printf_status)
-			usleep(100000); // 10Hz
 
 		// now we're streaming setpoint commands
 #ifdef DEBUG
@@ -883,9 +908,12 @@ void Autopilot_Interface::start(void)
 #endif // DEBUG
 	}
 
+#ifdef DEBUG
+	printf("Start routine is completed!\n");
+#endif // DEBUG
+
 	// Done!
 	return;
-
 }
 
 // ------------------------------------------------------------------------------
@@ -903,19 +931,23 @@ void Autopilot_Interface::stop(void)
 	// signal exit
 	time_to_exit = true;
 
-	// wait for exit	
-	pthread_join(vision_position_estimate_write_tid, NULL);
-	pthread_join(read_tid ,NULL);
-	pthread_join(write_tid,NULL);
-	pthread_join(printf_tid, NULL);
+	// wait for exit
+	vision_position_estimate_write_tid.stop(2.0);
+	read_tid.stop(2.0);
+	write_tid.stop(2.0);
+
+#ifdef DEBUG
+	printf("Trying to close mocap THREADS\n");
+#endif // DEBUG
 	mocap.stop();
 
 	// now the read and write threads are closed
 #ifdef DEBUG
-	printf("\n");
+	printf("All threads are closed\n");
 #endif // DEBUG
 
 	// still need to close the port separately
+	return;
 }
 
 // ------------------------------------------------------------------------------
@@ -1011,6 +1043,7 @@ void Autopilot_Interface::handle_quit( int sig )
 	catch (int error) {
 		fprintf(stderr,"Warning, could not stop autopilot interface\n");
 	}
+	return;
 
 }
 void Autopilot_Interface::handle_quit_no_control(int sig)
