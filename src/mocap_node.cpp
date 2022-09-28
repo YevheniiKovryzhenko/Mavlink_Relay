@@ -58,8 +58,14 @@
 
 #include "optitrack_channels.h"
 #include "optitrack.hpp"
+#include "thread_defs.hpp"
 
 //#define DEBUG
+
+static uint64_t __get_dt_us(uint64_t last_time)
+{
+    return get_time_usec() - last_time;
+}
 
 void __copy_data(mocap_data_t& buff_out, mocap_data_t& buff_in)
 {
@@ -169,7 +175,7 @@ char mocap_node_t::start(std::string ip_addr)
         stop();
         return -1;
     }
-    if (thread.init(0, OTHER))
+    if (thread.init(MOCAP_THREAD_PRI, MOCAP_THREAD_TYPE))
     {
         printf("ERROR in start: failed to initialize thread\n");
         stop();
@@ -198,7 +204,7 @@ char mocap_node_t::stop(void)
     time_to_exit = true;
 
     // wait for exit
-    thread.stop(2.0);
+    thread.stop(MOCAP_THREAD_TOUT);
     //pthread_join(read_tid, NULL);
 
     // destroy mutex
@@ -230,15 +236,14 @@ void mocap_node_t::start_read_thread()
 // ------------------------------------------------------------------------------
 //   Mocap Read Thread
 // ------------------------------------------------------------------------------
-void
-mocap_node_t::read_thread()
+void mocap_node_t::read_thread()
 {
     reading_status = true;
 
     while (!time_to_exit)
     {
-        read_messages();
-        usleep(10000); // Read batches at 100Hz
+        read_messages();         
+        usleep(1.0E6 / MOCAP_THREAD_HZ - __get_dt_us(time_us_old)); // Read batches at 100Hz
     }
 
     reading_status = false;

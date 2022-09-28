@@ -33,12 +33,23 @@
 // ------------------------------------------------------------------------------
 
 #include "autopilot_interface.hpp"
+#include "thread_defs.hpp"
 
 // terminal emulator control sequences
 #define WRAP_DISABLE	"\033[?7l"
 #define WRAP_ENABLE		"\033[?7h"
 
+//other defines
+#define PRINTF_DATA_WIDTH 11
+#define PRINT_HEADER(in) __print_header(#in, PRINTF_DATA_WIDTH)
+#define PRINT_DATA(in) __print_data_float(in, PRINTF_DATA_WIDTH)
+
 //#define DEBUG
+
+static uint64_t __get_dt_us(uint64_t last_time)
+{
+	return get_time_usec() - last_time;
+}
 
 
 // ----------------------------------------------------------------------------------
@@ -175,10 +186,10 @@ Autopilot_Interface::Autopilot_Interface(Generic_Port *port_)
 	time_to_exit   = false;  // flag to signal thread exit
 
 	// init threads
-	read_tid.init(0,OTHER);
-	write_tid.init(0, OTHER);
-	vision_position_estimate_write_tid.init(0, OTHER);
-	printf_tid.init(0, OTHER);
+	read_tid.init(READ_THREAD_PRI, READ_THREAD_TYPE);
+	write_tid.init(WRITE_THREAD_PRI, WRITE_THREAD_TYPE);
+	vision_position_estimate_write_tid.init(VPE_THREAD_PRI, VPE_THREAD_TYPE);
+	printf_tid.init(PRINTF_THREAD_PRI, PRINTF_THREAD_TYPE);
 
 	system_id    = 0; // system id
 	autopilot_id = 0; // autopilot component id
@@ -199,10 +210,10 @@ Autopilot_Interface::Autopilot_Interface(Generic_Port* port_, std::string ip_add
 	control_status = 0;      // whether the autopilot is in offboard control mode
 	time_to_exit = false;  // flag to signal thread exit
 
-	read_tid.init(0, OTHER);
-	write_tid.init(0, OTHER);
-	vision_position_estimate_write_tid.init(0, OTHER);
-	printf_tid.init(0, OTHER);
+	read_tid.init(READ_THREAD_PRI, READ_THREAD_TYPE);
+	write_tid.init(WRITE_THREAD_PRI, WRITE_THREAD_TYPE);
+	vision_position_estimate_write_tid.init(VPE_THREAD_PRI, VPE_THREAD_TYPE);
+	printf_tid.init(PRINTF_THREAD_PRI, PRINTF_THREAD_TYPE);
 
 	system_id = 0; // system id
 	autopilot_id = 0; // autopilot component id
@@ -941,9 +952,10 @@ void Autopilot_Interface::stop(void)
 	time_to_exit = true;
 
 	// wait for exit
-	vision_position_estimate_write_tid.stop(2.0);
-	read_tid.stop(2.0);
-	write_tid.stop(2.0);
+	printf_tid.stop(PRINTF_THREAD_TOUT);
+	vision_position_estimate_write_tid.stop(VPE_THREAD_TOUT);
+	read_tid.stop(READ_THREAD_TOUT);
+	write_tid.stop(WRITE_THREAD_TOUT);	
 
 #ifdef DEBUG
 	printf("Trying to close mocap THREADS\n");
@@ -1072,9 +1084,6 @@ void Autopilot_Interface::handle_quit_no_control(int sig)
 // ------------------------------------------------------------------------------
 //   Printf
 // ------------------------------------------------------------------------------
-#define PRINTF_DATA_WIDTH 10
-#define PRINT_HEADER(in) __print_header(#in, PRINTF_DATA_WIDTH)
-#define PRINT_DATA(in) __print_data_float(in, PRINTF_DATA_WIDTH)
 
 void __print_header(const char* in, int size)
 {
@@ -1234,11 +1243,12 @@ void Autopilot_Interface::print_data(void)
 void Autopilot_Interface::read_thread(void)
 {
 	reading_status = true;
-
+	uint64_t tmp_time_us = get_time_usec();
 	while ( ! time_to_exit )
 	{
 		read_messages();
-		usleep(100000); // Read batches at 10Hz
+		usleep(1E6 / READ_THREAD_HZ - __get_dt_us(tmp_time_us)); // Read batches at 10Hz
+		tmp_time_us = get_time_usec();
 	}
 
 	reading_status = false;
@@ -1308,22 +1318,15 @@ void Autopilot_Interface::vision_position_estimate_write_thread(void)
 	vision_position_writing_status = 2;
 
 	// prepare an initial setpoint, just stay put
-	mavlink_vision_position_estimate_t vpe;	
+	mavlink_vision_position_estimate_t vpe;
+	vpe.covariance[0] = NAN;
 
+	//get the data from mocap
+	while (!__update_from_mocap(vpe, mocap_ID, mocap));
 	// set vision position estimate
 	{
 		std::lock_guard<std::mutex> lock(current_vision_position_estimate.mutex);
-		current_vision_position_estimate.time_us_old = current_vision_position_estimate.data.usec;
-		//current_vision_position_estimate.data = vpe;
-		vpe = current_vision_position_estimate.data;		
-	}
-	//get the data from mocap
-	while (!__update_from_mocap(vpe, mocap_ID, mocap));
-
-	vpe.covariance[0] = NAN;
-
-	{
-		std::lock_guard<std::mutex> lock(current_vision_position_estimate.mutex);
+		current_vision_position_estimate.time_us_old = get_time_usec();
 		current_vision_position_estimate.data = vpe;
 	}
 
@@ -1337,15 +1340,18 @@ void Autopilot_Interface::vision_position_estimate_write_thread(void)
 	bool tmp = false;
 	while (!time_to_exit)
 	{
+		uint64_t tmp_time_old;
 		tmp = false;
 		{
 			std::lock_guard<std::mutex> lock(current_vision_position_estimate.mutex);
+			tmp_time_old = current_vision_position_estimate.data.usec;
 			tmp = __update_from_mocap(current_vision_position_estimate.data, mocap_ID, mocap);
+			if (tmp) current_vision_position_estimate.time_us_old = tmp_time_old;
 		}
 		if (tmp)
-		{
+		{			
 			write_vision_position_estimate();
-			usleep(20000);   // Stream at 50Hz
+			usleep(1E6 / VPE_THREAD_HZ - __get_dt_us(tmp_time_old));   // Stream at 50Hz
 		}		
 	}
 
@@ -1387,10 +1393,12 @@ void Autopilot_Interface::write_thread(void)
 
 	// Pixhawk needs to see off-board commands at minimum 2Hz,
 	// otherwise it will go into fail safe
+	uint64_t time_tmp = get_time_usec();
 	while ( !time_to_exit )
-	{
-		usleep(250000);   // Stream at 4Hz
+	{		
 		write_setpoint();
+		usleep(1E6 / WRITE_THREAD_HZ - __get_dt_us(time_tmp));   // Stream at 4Hz
+		time_tmp = get_time_usec();
 	}
 
 	// signal end
@@ -1414,10 +1422,12 @@ void Autopilot_Interface::printf_thread(void)
 	print_header(); //stat by printing a header
 	
 	printf_status = true;
+	uint64_t tmp_time_us = get_time_usec();
 	while (!time_to_exit)
-	{
-		usleep(100000);   // Print at 10Hz
+	{		
 		print_data();
+		usleep(1E6 / PRINTF_THREAD_HZ - __get_dt_us(tmp_time_us));   // Print at 20Hz
+		tmp_time_us = get_time_usec();
 	}
 	printf("\n");
 
