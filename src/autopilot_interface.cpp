@@ -1173,7 +1173,7 @@ void Autopilot_Interface::print_data(void)
 	//printf(WRAP_DISABLE);
 	if (enable_vpe_fl && printf_vpe_fl)
 	{
-		PRINT_DATA((1.0E6/(vpe.usec - vpe_time_us_old)));
+		PRINT_DATA(1.0E6 / (vpe.usec - vpe_time_us_old));
 		PRINT_DATA(vpe.roll);
 		PRINT_DATA(vpe.pitch);
 		PRINT_DATA(vpe.yaw);
@@ -1395,6 +1395,7 @@ void Autopilot_Interface::printf_thread(void)
 		usleep(100000);   // Print at 10Hz
 		print_data();
 	}
+	printf("\n");
 
 	// put linewrap back on
 	printf(WRAP_ENABLE);
