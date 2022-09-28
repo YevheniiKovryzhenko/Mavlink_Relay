@@ -1,50 +1,30 @@
-/****************************************************************************
+/*
+ * serial_port.cpp
  *
- *   Copyright (c) 2014 MAVlink Development Team. All rights reserved.
- *   Author: Trent Lukaczyk, <aerialhedgehog@gmail.com>
- *           Jaycee Lock,    <jaycee.lock@gmail.com>
- *           Lorenz Meier,   <lm@inf.ethz.ch>
+ * Author:	Yevhenii Kovryzhenko, Department of Aerospace Engineering, Auburn University.
+ * Contact: yzk0058@auburn.edu
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in
- *    the documentation and/or other materials provided with the
- *    distribution.
- * 3. Neither the name PX4 nor the names of its contributors may be
- *    used to endorse or promote products derived from this software
- *    without specific prior written permission.
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
- * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
- * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
- * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED ''AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL I
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- ****************************************************************************/
-
-/**
- * @file serial_port.cpp
+ * Last Edit:  09/28/2022 (MM/DD/YYYY)
  *
- * @brief Serial interface functions
- *
- * Functions for opening, closing, reading and writing via serial ports
- *
- * @author Trent Lukaczyk, <aerialhedgehog@gmail.com>
- * @author Jaycee Lock,    <jaycee.lock@gmail.com>
- * @author Lorenz Meier,   <lm@inf.ethz.ch>
- *
+ * Functions for opening, closing, reading and writing via serial ports.
  */
 
 
@@ -52,7 +32,7 @@
 //   Includes
 // ------------------------------------------------------------------------------
 
-#include "serial_port.h"
+#include "serial_port.hpp"
 
 //#define DEBUG
 // ----------------------------------------------------------------------------------
@@ -295,11 +275,8 @@ int Serial_Port::_write_port(char *buf, unsigned len)
 	pthread_mutex_lock(&lock);
 
 	// Write packet via serial link
-	//const int bytesWritten = static_cast<int>(write(fd, buf, len));
 	serial.writeBytes(buf, len);
 	serial.sync();
-	// Wait until all data has been written
-	//tcdrain(fd);
 
 	// Unlock
 	pthread_mutex_unlock(&lock);

@@ -191,9 +191,7 @@ read_message(mavlink_message_t &message)
 // ------------------------------------------------------------------------------
 //   Write to UDP
 // ------------------------------------------------------------------------------
-int
-UDP_Port::
-write_message(const mavlink_message_t &message)
+int UDP_Port::write_message(const mavlink_message_t &message)
 {
 	char buf[300];
 
@@ -343,9 +341,7 @@ _read_port(uint8_t& cp)
 // ------------------------------------------------------------------------------
 //   Write Port with Lock
 // ------------------------------------------------------------------------------
-int
-UDP_Port::
-_write_port(char *buf, unsigned len)
+int UDP_Port::_write_port(char* buf, unsigned len)
 {
 
 	// Lock
@@ -353,7 +349,7 @@ _write_port(char *buf, unsigned len)
 
 	// Write packet via UDP link
 	int bytesWritten = 0;
-	if(tx_port > 0){
+	if (tx_port > 0) {
 		struct sockaddr_in addr;
 		memset(&addr, 0, sizeof(addr));
 		addr.sin_family = AF_INET;
@@ -361,7 +357,9 @@ _write_port(char *buf, unsigned len)
 		addr.sin_port = htons(tx_port);
 		bytesWritten = sendto(sock, buf, len, 0, (struct sockaddr*)&addr, sizeof(struct sockaddr_in));
 		//printf("sendto: %i\n", bytesWritten);
-	}else{
+	}
+	else
+	{
 		printf("ERROR: Sending before first packet received!\n");
 		bytesWritten = -1;
 	}

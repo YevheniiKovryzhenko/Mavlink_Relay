@@ -1,50 +1,30 @@
-/****************************************************************************
+/*
+ * autopilot_interface.hpp
  *
- *   Copyright (c) 2014 MAVlink Development Team. All rights reserved.
- *   Author: Trent Lukaczyk, <aerialhedgehog@gmail.com>
- *           Jaycee Lock,    <jaycee.lock@gmail.com>
- *           Lorenz Meier,   <lm@inf.ethz.ch>
+ * Author:	Yevhenii Kovryzhenko, Department of Aerospace Engineering, Auburn University.
+ * Contact: yzk0058@auburn.edu
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in
- *    the documentation and/or other materials provided with the
- *    distribution.
- * 3. Neither the name PX4 nor the names of its contributors may be
- *    used to endorse or promote products derived from this software
- *    without specific prior written permission.
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
- * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
- * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
- * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED ''AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL I
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- ****************************************************************************/
-
-/**
- * @file autopilot_interface.h
- *
- * @brief Autopilot interface definition
+ * Last Edit:  09/28/2022 (MM/DD/YYYY)
  *
  * Functions for sending and recieving commands to an autopilot via MAVlink
- *
- * @author Trent Lukaczyk, <aerialhedgehog@gmail.com>
- * @author Jaycee Lock,    <jaycee.lock@gmail.com>
- * @author Lorenz Meier,   <lm@inf.ethz.ch>
- *
  */
 
 
@@ -286,8 +266,10 @@ public:
 	void stop(void);
 
 	void enable_control(void);
+	void enable_mocap(void);
 	void enable_telemetry(void);
 	void enable_vpe(void);
+	void enable_print_mocap(void);
 	void enable_print_vpe(void);
 	void enable_print_control(void);
 	void enable_print_telemetry(void);
@@ -302,10 +284,12 @@ public:
 
 
 private:
+	bool enable_mocap_fl = false;
 	bool enable_vpe_fl = false;
 	bool enable_control_fl = false;
-	bool enable_telemetry_fl = true;
+	bool enable_telemetry_fl = false;
 	bool enable_printf_fl = false;
+	bool printf_mocap_fl = false;
 	bool printf_vpe_fl = false;
 	bool printf_control_fl = false;
 	bool printf_telemetry_fl = false;

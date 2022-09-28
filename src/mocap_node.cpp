@@ -1,3 +1,32 @@
+/*
+ * mocap_node.cpp
+ *
+ * Author:	Yevhenii Kovryzhenko, Department of Aerospace Engineering, Auburn University.
+ * Contact: yzk0058@auburn.edu
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED ''AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL I
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Last Edit:  09/28/2022 (MM/DD/YYYY)
+ *
+ * Functions to start and stop the optitrack mocap thread.
+ */
+
 #include "mocap_node.hpp"
 
 #include <getopt.h>
@@ -162,7 +191,7 @@ char mocap_node_t::start(std::string ip_addr)
 char mocap_node_t::stop(void)
 {
 #ifdef DEBUG
-    printf("Terminating mocap note thread\n");
+    printf("Terminating mocap node thread\n");
 #endif // DEBUG
 
     // signal exit
@@ -175,7 +204,7 @@ char mocap_node_t::stop(void)
     // destroy mutex
     pthread_mutex_destroy(&lock);
 #ifdef DEBUG
-    printf("Done terminating mocap note thread\n");
+    printf("Done terminating mocap node thread\n");
 #endif // DEBUG
     return 0;
 }
@@ -266,17 +295,17 @@ char mocap_node_t::init(std::string ip_addr)
 // ------------------------------------------------------------------------------
 char mocap_node_t::march(void)
 {
-    // Lock
-    pthread_mutex_lock(&lock);
-
     // Block until we receive a datagram from the network
     sockaddr_in incomingAddress;
     recvfrom(dataSocket, buff, BUFF_LEN, 0,
         (sockaddr*)&incomingAddress, &ADDRLEN);
+
+    // Lock
+    pthread_mutex_lock(&lock);    
     incomingMessages =
         parse_optitrack_packet_into_messages(buff, BUFF_LEN);
+    time_us_old = time_us;
     time_us = get_time_usec();
-
     // Unlock
     pthread_mutex_unlock(&lock);
     return 0;
@@ -293,11 +322,13 @@ char mocap_node_t::get_data(mocap_data_t& buff, int ID)
     size_t tmp = incomingMessages.size();
     if (tmp < 1)
     {
+#ifdef DEBUG
         printf("WARNING in get_data: have not received new data (vector is empty)\n");
+#endif // DEBUG       
 
         // Unlock
         pthread_mutex_unlock(&lock);
-        return -1;
+        return 0;
     }
     for (auto& msg : incomingMessages)
     {
@@ -306,6 +337,7 @@ char mocap_node_t::get_data(mocap_data_t& buff, int ID)
             optitrack_message_t tmp_msg = msg;
             if (YUP2END) __rotate2NED_YUP(tmp_msg);
             __copy_data(buff, tmp_msg);
+            buff.time_us_old = time_us_old;
             buff.time_us = time_us;
 
             // Unlock

@@ -1,50 +1,30 @@
-/****************************************************************************
+/*
+ * mavlink_control.cpp
  *
- *   Copyright (c) 2014 MAVlink Development Team. All rights reserved.
- *   Author: Trent Lukaczyk, <aerialhedgehog@gmail.com>
- *           Jaycee Lock,    <jaycee.lock@gmail.com>
- *           Lorenz Meier,   <lm@inf.ethz.ch>
+ * Author:	Yevhenii Kovryzhenko, Department of Aerospace Engineering, Auburn University.
+ * Contact: yzk0058@auburn.edu
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in
- *    the documentation and/or other materials provided with the
- *    distribution.
- * 3. Neither the name PX4 nor the names of its contributors may be
- *    used to endorse or promote products derived from this software
- *    without specific prior written permission.
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
- * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
- * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
- * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED ''AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL I
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- ****************************************************************************/
-
-/**
- * @file mavlink_control.cpp
+ * Last Edit:  09/28/2022 (MM/DD/YYYY)
  *
- * @brief An example offboard control process via mavlink
- *
- * This process connects an external MAVLink UART device to send an receive data
- *
- * @author Trent Lukaczyk, <aerialhedgehog@gmail.com>
- * @author Jaycee Lock,    <jaycee.lock@gmail.com>
- * @author Lorenz Meier,   <lm@inf.ethz.ch>
- *
+ * This process connects an external MAVLink UART device to send and receive data.
  */
 
 
@@ -53,7 +33,7 @@
 //   Includes
 // ------------------------------------------------------------------------------
 
-#include "mavlink_control.h"
+#include "mavlink_control.hpp"
 //#define DEBUG
 
 bool termination_requested = false;
@@ -71,34 +51,35 @@ top (int argc, char **argv)
 	// --------------------------------------------------------------------------
 
 	// Default input arguments
+	settings_t settings;
+
 #ifdef __APPLE__
-	char *uart_name = (char*)"/dev/tty.usbmodem1";
+	settings.uart_name = (char*)"/dev/tty.usbmodem1";
 #else
-	char *uart_name = (char*)"/dev/ttyUSB0";
+	settings.uart_name = (char*)"/dev/ttyUSB0";
 #endif
-	bool use_uart = false;
-	int baudrate = 57600;
+	settings.use_uart = false;
+	settings.baudrate = 57600;
 
-	bool use_udp = false;
-	char *udp_ip = (char*)"127.0.0.1";
-	int udp_port = 14540;
-	bool autotakeoff = false;
+	settings.use_udp = false;
+	settings.udp_ip = (char*)"127.0.0.1";
+	settings.udp_port = 14540;
+	settings.autotakeoff = false;
 
-	bool enable_mocap = false;
-	char* mocap_ip = (char*)"127.0.0.1";
-	int mocap_ID = 1;
+	settings.enable_mocap = false;
+	settings.mocap_ip = (char*)"127.0.0.1";
+	settings.mocap_ID = 1;
 
-	bool enable_control = false;
+	settings.enable_control = false;
+	settings.enable_telemetry = true;
 
-	bool print_control = false;
-	bool print_vpe = false;
-	bool print_telemetry = false;
+	settings.print_control = false;
+	settings.print_vpe = false;
+	settings.print_telemetry = false;
 
 	// do the parse, will throw an int if it fails
-	parse_commandline(argc, argv, use_uart, uart_name, baudrate, use_udp, udp_ip, udp_port, autotakeoff,
-		enable_mocap, mocap_ip, mocap_ID, enable_control, print_control, print_telemetry, print_vpe);
+	parse_commandline(argc, argv, settings);
 
-	bool use_uart_or_udp = use_uart || use_udp;
 	// --------------------------------------------------------------------------
 	//   PORT and THREAD STARTUP
 	// --------------------------------------------------------------------------
@@ -115,13 +96,13 @@ top (int argc, char **argv)
 	 */
 	Generic_Port *port;
 
-	if (use_udp)
+	if (settings.use_udp)
 	{
-		port = new UDP_Port(udp_ip, udp_port);
+		port = new UDP_Port(settings.udp_ip, settings.udp_port);
 	}
 	else
 	{
-		port = new Serial_Port(uart_name, baudrate);
+		port = new Serial_Port(settings.uart_name, settings.baudrate);
 	}
 
 	/*
@@ -139,9 +120,9 @@ top (int argc, char **argv)
 	* otherwise the vehicle will go into failsafe.
 	*
 	*/
-	Autopilot_Interface autopilot_interface(port, mocap_ip, mocap_ID);	
+	Autopilot_Interface autopilot_interface(port, settings.mocap_ip, settings.mocap_ID);
 
-	if (enable_control)
+	if (settings.enable_control)
 	{
 		autopilot_interface.enable_control();
 
@@ -177,48 +158,54 @@ top (int argc, char **argv)
 #endif // DEBUG
 
 
-	if (enable_mocap) //for now don't do control
+	if (settings.enable_mocap) //for now don't do control
 	{
 #ifdef DEBUG
 		printf("Enabling mocap...\n");
 #endif // DEBUG
-		autopilot_interface.enable_vpe();
-		if (print_vpe) autopilot_interface.enable_print_vpe();
+		autopilot_interface.enable_mocap();
+		if (settings.print_mocap) autopilot_interface.enable_print_mocap();
+		if (settings.enable_telemetry)
+		{
+			autopilot_interface.enable_vpe();
+			if (settings.print_vpe) autopilot_interface.enable_print_vpe();
+		}
 	}
 
-	if (enable_control)
+	if (settings.enable_control)
 	{
 #ifdef DEBUG
 		printf("Enabling control...\n");
 #endif // DEBUG
 		autopilot_interface.enable_control();
-		if (print_control) autopilot_interface.enable_print_control();
+		if (settings.print_control) autopilot_interface.enable_print_control();
 	}
 
+	if (settings.enable_telemetry)
+	{
 #ifdef DEBUG
-	printf("Enabling telemetry...\n");
+		printf("Enabling telemetry...\n");
 #endif // DEBUG
-	autopilot_interface.enable_telemetry();
-	if (print_telemetry) autopilot_interface.enable_print_telemetry();
+		autopilot_interface.enable_telemetry();
+		if (settings.print_telemetry) autopilot_interface.enable_print_telemetry();
 
-#ifdef DEBUG
-	printf("Enabling printing...\n");
-#endif // DEBUG
 
-	/*
-	* Start the port and autopilot_interface
-	* This is where the port is opened, and read and write threads are started.
-	*/
+		/*
+		* Start the port and autopilot_interface
+		* This is where the port is opened, and read and write threads are started.
+		*/
 #ifdef DEBUG
-	printf("Starting port...\n");
+		printf("Starting port...\n");
 #endif // DEBUG
-	port->start();
+		port->start();
 #ifdef DEBUG
-	printf("Starting autopilot interface...\n");
+		printf("Starting autopilot interface...\n");
 #endif // DEBUG
+	}
+
 	autopilot_interface.start();
 
-	if (enable_control)
+	if (settings.enable_control)
 	{
 #ifdef DEBUG
 		printf("Running commands port...\n");
@@ -230,7 +217,7 @@ top (int argc, char **argv)
 		/*
 		* Now we can implement the algorithm we want on top of the autopilot interface
 		*/
-		commands(autopilot_interface, autotakeoff);
+		commands(autopilot_interface, settings.autotakeoff);
 	}
 
 	while (!termination_requested)
@@ -439,27 +426,30 @@ commands(Autopilot_Interface &api, bool autotakeoff)
 //   Parse Command Line
 // ------------------------------------------------------------------------------
 // throws EXIT_FAILURE if could not open the port
-void parse_commandline(int argc, char **argv, bool use_uart, char *&uart_name, int &baudrate,\
-		bool &use_udp, char *&udp_ip, int &udp_port, bool &autotakeoff,\
-	bool &enable_mocap, char *&mocap_ip, int& mocap_ID, bool& enable_control,\
-	bool& print_control, bool& print_telemetry, bool& print_vpe)
+void parse_commandline(int argc, char **argv, settings_t& settings)
 {
 
 	// string for command line usage
 	const char* commandline_usage = \
-		"usage of mavlink_control:\n"
-		"-h				help			prints this message)\n"
-		"-d				device			specify device name,		/dev/ttyUSB0\n"
-		"-b				baudrate		specify baudrate,			57600\n"
-		"-u				udp_ip			specify upd address,		127.0.0.1\n"
-		"-p				port			specify udp port,			14540\n"
-		"-c				enable_control	enable control algorithm\n"
-		"-m				mocap_ip		specify mocap interface		127.0.0.1\n"
-		"-mI			mocap_ID		specify frame ID from mocap	1\n"
-		"-pc			print_control	print setpoints to console\n"
-		"-pm			print_mocap		print mocap tracking\n"
-		"-pt			print_telemetry print data from the vehicle\n";
-
+		"\n-----------------------------------------------------------------------------------------------------------------\n"
+		"			Usage of mavlink_control"
+		"\n-----------------------------------------------------------------------------------------------------------------\n"
+		"shortcut	\tfull flag			meaning					default value\n"
+		"-h			--help				prints this message\n"
+		"-d			--device			specify device name\t		/dev/ttyUSB0\n"
+		"-b			--baudrate			specify baudrate			57600\n"
+		"-u			--udp_ip			specify upd address\t		127.0.0.1\n"
+		"-p			--port				specify udp port			14540\n"
+		"-c			--enable_control\t	enable control algorithm		false\n"
+		"-t			--disable_telem\t\t	disable telemetry send/receive\t\tfalse\n"
+		"-m			--mocap_ip			specify mocap interface\t		127.0.0.1\n"
+		"-mI\t		--mocap_ID			specify frame ID from mocap\t	1\n"
+		"-pc\t		--print_control\t\t	print setpoints to console		false\n"
+		"-pm\t		--print_mocap\t		print mocap tracking			false\n"
+		"-pv\t		--print_vpe\t		print vision position estimate\t	false\n"
+		"-pt\t		--print_telemetry\t	print data from the vehicle		false"
+		"\n-----------------------------------------------------------------------------------------------------------------\n";
+		
 	// Read input arguments
 	for (int i = 1; i < argc; i++) { // argv[0] is "mavlink"
 
@@ -473,8 +463,8 @@ void parse_commandline(int argc, char **argv, bool use_uart, char *&uart_name, i
 		if (strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "--device") == 0) {
 			if (argc > i + 1) {
 				i++;
-				use_uart = true;
-				uart_name = argv[i];
+				settings.use_uart = true;
+				settings.uart_name = argv[i];
 			} else {
 				printf("%s\n",commandline_usage);
 				throw EXIT_FAILURE;
@@ -485,7 +475,7 @@ void parse_commandline(int argc, char **argv, bool use_uart, char *&uart_name, i
 		if (strcmp(argv[i], "-b") == 0 || strcmp(argv[i], "--baud") == 0) {
 			if (argc > i + 1) {
 				i++;
-				baudrate = atoi(argv[i]);
+				settings.baudrate = atoi(argv[i]);
 			} else {
 				printf("%s\n",commandline_usage);
 				throw EXIT_FAILURE;
@@ -496,8 +486,8 @@ void parse_commandline(int argc, char **argv, bool use_uart, char *&uart_name, i
 		if (strcmp(argv[i], "-u") == 0 || strcmp(argv[i], "--udp_ip") == 0) {
 			if (argc > i + 1) {
 				i++;
-				udp_ip = argv[i];
-				use_udp = true;
+				settings.udp_ip = argv[i];
+				settings.use_udp = true;
 			} else {
 				printf("%s\n",commandline_usage);
 				throw EXIT_FAILURE;
@@ -508,24 +498,20 @@ void parse_commandline(int argc, char **argv, bool use_uart, char *&uart_name, i
 		if (strcmp(argv[i], "-p") == 0 || strcmp(argv[i], "--port") == 0) {
 			if (argc > i + 1) {
 				i++;
-				udp_port = atoi(argv[i]);
+				settings.udp_port = atoi(argv[i]);
 			} else {
 				printf("%s\n",commandline_usage);
 				throw EXIT_FAILURE;
 			}
 		}
-
-		// Autotakeoff
-		if (strcmp(argv[i], "-a") == 0 || strcmp(argv[i], "--autotakeoff") == 0) {
-			autotakeoff = true;
-		}
+		
 
 		// mocap
 		if (strcmp(argv[i], "-m") == 0 || strcmp(argv[i], "--mocap_ip") == 0) {
 			if (argc > i + 1) {
 				i++;
-				mocap_ip = argv[i];
-				enable_mocap = true;
+				settings.mocap_ip = argv[i];
+				settings.enable_mocap = true;
 			}
 			else {
 				printf("%s\n", commandline_usage);
@@ -535,8 +521,8 @@ void parse_commandline(int argc, char **argv, bool use_uart, char *&uart_name, i
 		if (strcmp(argv[i], "-mI") == 0 || strcmp(argv[i], "--mocap_ID") == 0) {
 			if (argc > i + 1) {
 				i++;
-				mocap_ID = atoi(argv[i]);
-				enable_mocap = true;
+				settings.mocap_ID = atoi(argv[i]);
+				settings.enable_mocap = true;
 			}
 			else {
 				printf("%s\n", commandline_usage);
@@ -544,19 +530,32 @@ void parse_commandline(int argc, char **argv, bool use_uart, char *&uart_name, i
 			}
 		}
 
+		//control
 		if (strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--enable_control") == 0) {
-			enable_control = true;
+			settings.enable_control = true;
+		}
+		// Autotakeoff
+		if (strcmp(argv[i], "-a") == 0 || strcmp(argv[i], "--autotakeoff") == 0) {
+			settings.autotakeoff = true;
+		}
+
+		//telemetry
+		if (strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--disable_telem") == 0) {
+			settings.enable_telemetry = false;
 		}
 
 		//printf settings
 		if (strcmp(argv[i], "-pm") == 0 || strcmp(argv[i], "--print_mocap") == 0) {
-			print_vpe = true;
+			settings.print_mocap = true;
+		}
+		if (strcmp(argv[i], "-pv") == 0 || strcmp(argv[i], "--print_vpe") == 0) {
+			settings.print_vpe = true;
 		}
 		if (strcmp(argv[i], "-pc") == 0 || strcmp(argv[i], "--print_control") == 0) {
-			print_control = true;
+			settings.print_control = true;
 		}
 		if (strcmp(argv[i], "-pt") == 0 || strcmp(argv[i], "--print_telemetry") == 0) {
-			print_telemetry = true;
+			settings.print_telemetry = true;
 		}
 	}
 	// end: for each input argument
@@ -572,11 +571,9 @@ void parse_commandline(int argc, char **argv, bool use_uart, char *&uart_name, i
 // this function is called when you press Ctrl-C
 void quit_handler( int sig )
 {
-#ifdef DEBUG
 	printf("\n");
-	printf("TERMINATING AT USER REQUEST\n");
+	printf("Detected ctrl+c, terminating the program...\n");
 	printf("\n");
-#endif // DEBUG	
 	termination_requested = true;
 
 	// autopilot interface

@@ -1,50 +1,30 @@
-/****************************************************************************
+/*
+ * autopilot_interface.hpp
  *
- *   Copyright (c) 2014 MAVlink Development Team. All rights reserved.
- *   Author: Trent Lukaczyk, <aerialhedgehog@gmail.com>
- *           Jaycee Lock,    <jaycee.lock@gmail.com>
- *           Lorenz Meier,   <lm@inf.ethz.ch>
+ * Author:	Yevhenii Kovryzhenko, Department of Aerospace Engineering, Auburn University.
+ * Contact: yzk0058@auburn.edu
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in
- *    the documentation and/or other materials provided with the
- *    distribution.
- * 3. Neither the name PX4 nor the names of its contributors may be
- *    used to endorse or promote products derived from this software
- *    without specific prior written permission.
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
- * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
- * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
- * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED ''AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL I
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- ****************************************************************************/
-
-/**
- * @file autopilot_interface.cpp
- *
- * @brief Autopilot interface functions
+ * Last Edit:  09/28/2022 (MM/DD/YYYY)
  *
  * Functions for sending and recieving commands to an autopilot via MAVlink
- *
- * @author Trent Lukaczyk, <aerialhedgehog@gmail.com>
- * @author Jaycee Lock,    <jaycee.lock@gmail.com>
- * @author Lorenz Meier,   <lm@inf.ethz.ch>
- *
  */
 
 
@@ -52,7 +32,7 @@
 //   Includes
 // ------------------------------------------------------------------------------
 
-#include "autopilot_interface.h"
+#include "autopilot_interface.hpp"
 
 // terminal emulator control sequences
 #define WRAP_DISABLE	"\033[?7l"
@@ -248,9 +228,20 @@ void Autopilot_Interface::enable_telemetry(void)
 	enable_telemetry_fl = true;
 	return;
 }
+void Autopilot_Interface::enable_mocap(void)
+{
+	enable_mocap_fl = true;
+	return;
+}
 void Autopilot_Interface::enable_vpe(void)
 {
 	enable_vpe_fl = true;
+	return;
+}
+void Autopilot_Interface::enable_print_mocap(void)
+{
+	enable_printf_fl = true;
+	printf_mocap_fl = true;
 	return;
 }
 void Autopilot_Interface::enable_print_vpe(void)
@@ -474,8 +465,7 @@ void Autopilot_Interface::read_messages(void)
 // ------------------------------------------------------------------------------
 //   Write Message
 // ------------------------------------------------------------------------------
-int
-Autopilot_Interface::write_message(mavlink_message_t message)
+int Autopilot_Interface::write_message(mavlink_message_t message)
 {
 	// do the write
 	int len = port->write_message(message);
@@ -723,28 +713,32 @@ void Autopilot_Interface::start(void)
 #endif // DEBUG
 
 
-	// --------------------------------------------------------------------------
-	//   CHECK PORT
-	// --------------------------------------------------------------------------
+	if (enable_telemetry_fl)
+	{
+		// --------------------------------------------------------------------------
+		//   CHECK PORT
+		// --------------------------------------------------------------------------
 
 #ifdef DEBUG
-	printf("Checking if port is running...\n");
+		printf("Checking if port is running...\n");
 #endif // DEBUG
-	if (!port->is_running()) // PORT_OPEN
-	{
-		fprintf(stderr, "ERROR: port not open\n");
-		throw 1;
+		if (!port->is_running()) // PORT_OPEN
+		{
+			fprintf(stderr, "ERROR: port not open\n");
+			throw 1;
+		}
+#ifdef DEBUG
+		printf("Good.\n");
+#endif // DEBUG
 	}
+
 #ifdef DEBUG
-	printf("Good.\n");
+	printf("Check if mocap is enabled\n");
 #endif // DEBUG
-#ifdef DEBUG
-	printf("Check if vpe is enabled\n");
-#endif // DEBUG
-	if (enable_vpe_fl)
+	if (enable_mocap_fl)
 	{
 #ifdef DEBUG
-		printf("VPE is enabled, starting...\n");
+		printf("mocap is enabled, starting...\n");
 #endif // DEBUG
 		// --------------------------------------------------------------------------
 		//   MOCAP READ THREAD
@@ -887,7 +881,7 @@ void Autopilot_Interface::start(void)
 #ifdef DEBUG
 	printf("Check if control is enabled\n");
 #endif // DEBUG
-	if (!enable_control_fl)
+	if (enable_control_fl)
 	{
 		// --------------------------------------------------------------------------
 		//   WRITE THREAD
@@ -1096,7 +1090,17 @@ void __print_data_float(double in, int size)
 }
 void Autopilot_Interface::print_header(void)
 {
-	printf("\n| ");	
+	printf("\n| ");
+	if (enable_mocap_fl && printf_mocap_fl)
+	{
+		PRINT_HEADER(mocap.Hz);
+		PRINT_HEADER(mocap.roll);
+		PRINT_HEADER(mocap.pitch);
+		PRINT_HEADER(mocap.yaw);
+		PRINT_HEADER(mocap.x);
+		PRINT_HEADER(mocap.y);
+		PRINT_HEADER(mocap.z);
+	}
 	if (enable_vpe_fl && printf_vpe_fl)
 	{
 		PRINT_HEADER(vpe.Hz);
@@ -1144,6 +1148,11 @@ void Autopilot_Interface::print_data(void)
 	Time_Stamps mav_time_stamps_old;
 	uint64_t sp_time_ms_old;
 	uint64_t vpe_time_us_old;
+	mocap_data_t mc;
+	if (enable_mocap_fl && printf_mocap_fl)
+	{
+		mocap.get_data(mc, mocap_ID);
+	}
 	if (enable_vpe_fl && printf_vpe_fl)
 	{
 		{
@@ -1169,8 +1178,16 @@ void Autopilot_Interface::print_data(void)
 
 	//print data
 	printf("\r| ");
-	// turn off linewrap to avoid runaway prints
-	//printf(WRAP_DISABLE);
+	if (enable_mocap_fl && printf_mocap_fl)
+	{
+		PRINT_DATA(1.0E6 / (mc.time_us - mc.time_us_old));
+		PRINT_DATA(mc.roll);
+		PRINT_DATA(mc.pitch);
+		PRINT_DATA(mc.yaw);
+		PRINT_DATA(mc.x);
+		PRINT_DATA(mc.y);
+		PRINT_DATA(mc.z);
+	}
 	if (enable_vpe_fl && printf_vpe_fl)
 	{
 		PRINT_DATA(1.0E6 / (vpe.usec - vpe_time_us_old));
@@ -1291,17 +1308,24 @@ void Autopilot_Interface::vision_position_estimate_write_thread(void)
 	vision_position_writing_status = 2;
 
 	// prepare an initial setpoint, just stay put
-	mavlink_vision_position_estimate_t vpe;
-	vpe.covariance[0] = NAN;
+	mavlink_vision_position_estimate_t vpe;	
 
 	// set vision position estimate
 	{
 		std::lock_guard<std::mutex> lock(current_vision_position_estimate.mutex);
 		current_vision_position_estimate.time_us_old = current_vision_position_estimate.data.usec;
+		//current_vision_position_estimate.data = vpe;
+		vpe = current_vision_position_estimate.data;		
+	}
+	//get the data from mocap
+	while (!__update_from_mocap(vpe, mocap_ID, mocap));
+
+	vpe.covariance[0] = NAN;
+
+	{
+		std::lock_guard<std::mutex> lock(current_vision_position_estimate.mutex);
 		current_vision_position_estimate.data = vpe;
-		//get the data from mocap
-		while (!__update_from_mocap(current_vision_position_estimate.data, mocap_ID, mocap));
-	}	
+	}
 
 	// write a message and signal writing
 	write_vision_position_estimate();
