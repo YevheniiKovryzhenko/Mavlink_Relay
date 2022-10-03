@@ -243,7 +243,7 @@ void mocap_node_t::read_thread()
     while (!time_to_exit)
     {
         read_messages();         
-        usleep(1.0E6 / MOCAP_THREAD_HZ - __get_dt_us(time_us_old)); // Read batches at 100Hz
+        usleep(1.0E6 / MOCAP_THREAD_HZ); // Read batches at 100Hz
     }
 
     reading_status = false;
@@ -375,21 +375,7 @@ bool is_mocap_data_same(mocap_data_t& data_new, mocap_data_t& data_old)
 // ------------------------------------------------------------------------------
 void mocap_node_t::read_messages()
 {
-    mocap_data_t tmp;
-    bool received_msg = false;
-    tmp.trackingValid = false;
-
-
-    // Blocking wait for new data
-    while (!time_to_exit)
-    {
-        march();
-
-        // give the other threads time to use the port
-        if (reading_status > false) {
-            usleep(100); // look for components of batches at 10kHz
-        }
-    }
+    march();
     return;
 }
 

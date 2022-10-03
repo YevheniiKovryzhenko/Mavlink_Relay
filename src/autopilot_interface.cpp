@@ -293,8 +293,8 @@ void Autopilot_Interface::read_messages(void)
 	Time_Stamps this_timestamps;
 
 	// Blocking wait for new data
-	while ( !received_all and !time_to_exit )
-	{
+	//while ( !received_all and !time_to_exit )
+	//{
 		// ----------------------------------------------------------------------
 		//   READ MESSAGE
 		// ----------------------------------------------------------------------
@@ -450,8 +450,8 @@ void Autopilot_Interface::read_messages(void)
 		} // end: if read message
 
 		// Check for receipt of all items
-		received_all =
-				this_timestamps.heartbeat                  &&
+		//received_all =
+		//		this_timestamps.heartbeat                  &&
 //				this_timestamps.battery_status             &&
 //				this_timestamps.radio_status               &&
 //				this_timestamps.local_position_ned         &&
@@ -460,15 +460,15 @@ void Autopilot_Interface::read_messages(void)
 //				this_timestamps.position_target_global_int &&
 //				this_timestamps.highres_imu                &&
 //				this_timestamps.attitude                   &&
-				this_timestamps.sys_status
-				;
-
+		//		this_timestamps.sys_status
+		//		;
+		
 		// give the write thread time to use the port
-		if ( writing_status > false ) {
-			usleep(100); // look for components of batches at 10kHz
-		}
+		//if ( writing_status > false ) {
+		//	usleep(100); // look for components of batches at 10kHz
+		//}
 
-	} // end: while not received all
+	//} // end: while not received all
 
 	return;
 }
@@ -856,32 +856,34 @@ void Autopilot_Interface::start(void)
 			printf("\n");
 		}
 
-
-		// --------------------------------------------------------------------------
-		//   GET INITIAL POSITION
-		// --------------------------------------------------------------------------
-
-		// Wait for initial position ned
-		printf("Waiting for telemetry...\n");
-		while (not (current_messages.time_stamps.local_position_ned &&
-			current_messages.time_stamps.attitude))
+		if (system_id < 255)
 		{
-			if (time_to_exit)
-				return;
-			usleep(500000);
+			// --------------------------------------------------------------------------
+			//   GET INITIAL POSITION
+			// --------------------------------------------------------------------------
+
+			// Wait for initial position ned
+			printf("Waiting for telemetry...\n");
+			while (not (current_messages.time_stamps.local_position_ned &&
+				current_messages.time_stamps.attitude))
+			{
+				if (time_to_exit)
+					return;
+				usleep(500000);
+			}
+			printf("Got initial atittude and position!\n");
+
+			// copy initial position ned
+			Mavlink_Messages local_data = current_messages;
+			initial_position.x = local_data.local_position_ned.x;
+			initial_position.y = local_data.local_position_ned.y;
+			initial_position.z = local_data.local_position_ned.z;
+			initial_position.vx = local_data.local_position_ned.vx;
+			initial_position.vy = local_data.local_position_ned.vy;
+			initial_position.vz = local_data.local_position_ned.vz;
+			initial_position.yaw = local_data.attitude.yaw;
+			initial_position.yaw_rate = local_data.attitude.yawspeed;
 		}
-
-		// copy initial position ned
-		Mavlink_Messages local_data = current_messages;
-		initial_position.x = local_data.local_position_ned.x;
-		initial_position.y = local_data.local_position_ned.y;
-		initial_position.z = local_data.local_position_ned.z;
-		initial_position.vx = local_data.local_position_ned.vx;
-		initial_position.vy = local_data.local_position_ned.vy;
-		initial_position.vz = local_data.local_position_ned.vz;
-		initial_position.yaw = local_data.attitude.yaw;
-		initial_position.yaw_rate = local_data.attitude.yawspeed;
-
 #ifdef DEBUG
 		printf("INITIAL POSITION XYZ = [ %.4f , %.4f , %.4f ] \n", initial_position.x, initial_position.y, initial_position.z);
 		printf("INITIAL POSITION YAW = %.4f \n", initial_position.yaw);
@@ -1247,7 +1249,7 @@ void Autopilot_Interface::read_thread(void)
 	while ( ! time_to_exit )
 	{
 		read_messages();
-		usleep(1E6 / READ_THREAD_HZ - __get_dt_us(tmp_time_us)); // Read batches at 10Hz
+		usleep(1E6 / READ_THREAD_HZ); // Read batches at 10Hz
 		tmp_time_us = get_time_usec();
 	}
 
@@ -1351,7 +1353,7 @@ void Autopilot_Interface::vision_position_estimate_write_thread(void)
 		if (tmp)
 		{			
 			write_vision_position_estimate();
-			usleep(1E6 / VPE_THREAD_HZ - __get_dt_us(tmp_time_old));   // Stream at 50Hz
+			usleep(1E6 / VPE_THREAD_HZ);   // Stream at 50Hz
 		}		
 	}
 
@@ -1397,7 +1399,7 @@ void Autopilot_Interface::write_thread(void)
 	while ( !time_to_exit )
 	{		
 		write_setpoint();
-		usleep(1E6 / WRITE_THREAD_HZ - __get_dt_us(time_tmp));   // Stream at 4Hz
+		usleep(1E6 / WRITE_THREAD_HZ);   // Stream at 4Hz
 		time_tmp = get_time_usec();
 	}
 
@@ -1426,7 +1428,7 @@ void Autopilot_Interface::printf_thread(void)
 	while (!time_to_exit)
 	{		
 		print_data();
-		usleep(1E6 / PRINTF_THREAD_HZ - __get_dt_us(tmp_time_us));   // Print at 20Hz
+		usleep(1E6 / PRINTF_THREAD_HZ);   // Print at 20Hz
 		tmp_time_us = get_time_usec();
 	}
 	printf("\n");
