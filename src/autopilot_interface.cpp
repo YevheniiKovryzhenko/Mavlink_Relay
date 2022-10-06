@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Last Edit:  09/28/2022 (MM/DD/YYYY)
+ * Last Edit:  10/05/2022 (MM/DD/YYYY)
  *
  * Functions for sending and recieving commands to an autopilot via MAVlink
  */
@@ -86,8 +86,7 @@ void set_position(float x, float y, float z, mavlink_set_position_target_local_n
  * Modifies a mavlink_set_position_target_local_ned_t struct with target VX VY VZ
  * velocities in the Local NED frame, in meters per second.
  */
-void
-set_velocity(float vx, float vy, float vz, mavlink_set_position_target_local_ned_t &sp)
+void set_velocity(float vx, float vy, float vz, mavlink_set_position_target_local_ned_t &sp)
 {
 	sp.type_mask =
 		MAVLINK_MSG_SET_POSITION_TARGET_LOCAL_NED_VELOCITY     ;
@@ -242,6 +241,16 @@ void Autopilot_Interface::enable_telemetry(void)
 void Autopilot_Interface::enable_mocap(void)
 {
 	enable_mocap_fl = true;
+	return;
+}
+void Autopilot_Interface::toggle_mocap_YUP2NED(bool in)
+{
+	mocap.togle_YUP2NED(in);
+	return;
+}
+void Autopilot_Interface::toggle_mocap_ZUP2NED(bool in)
+{
+	mocap.togle_ZUP2NED(in);
 	return;
 }
 void Autopilot_Interface::enable_vpe(void)
@@ -756,7 +765,7 @@ void Autopilot_Interface::start(void)
 		// --------------------------------------------------------------------------
 #ifdef DEBUG
 		printf("START MOCAP READ THREAD \n");
-#endif // DEBUG	
+#endif // DEBUG
 		result = mocap.start(ip_addr_mocap);
 		if (result) throw result;
 
@@ -1284,6 +1293,80 @@ bool __is_vision_data_same(mavlink_vision_position_estimate_t& in1, mavlink_visi
 	return false;
 }
 
+int __quaternion_multiply_array(double a[4], double b[4], double c[4])
+{
+	//if (unlikely(a == NULL || b == NULL || c == NULL)) {
+	//	fprintf(stderr, "ERROR: in rc_quaternion_multiply_array, received NULL pointer\n");
+	//	return -1;
+	//}
+
+	int i, j;
+	double tmp[4][4];
+	// construct tmp matrix
+	tmp[0][0] = a[0];
+	tmp[0][1] = -a[1];
+	tmp[0][2] = -a[2];
+	tmp[0][3] = -a[3];
+	tmp[1][0] = a[1];
+	tmp[1][1] = a[0];
+	tmp[1][2] = -a[3];
+	tmp[1][3] = a[2];
+	tmp[2][0] = a[2];
+	tmp[2][1] = a[3];
+	tmp[2][2] = a[0];
+	tmp[2][3] = -a[1];
+	tmp[3][0] = a[3];
+	tmp[3][1] = -a[2];
+	tmp[3][2] = a[1];
+	tmp[3][3] = a[0];
+	// multiply
+	for (i = 0; i < 4; i++) {
+		c[i] = 0.0;
+		for (j = 0; j < 4; j++) c[i] += tmp[i][j] * b[j];
+	}
+	return 0;
+}
+
+int __quaternion_rotate_array(double p[4], double q[4])
+{
+	double conj[4], tmp[4];
+	//if (unlikely(p == NULL || q == NULL)) {
+	//	fprintf(stderr, "ERROR: in rc_quaternion_rotate_array, received NULL pointer\n");
+	//	return -1;
+	//}
+	// make a conjugate of q
+	conj[0] = q[0];
+	conj[1] = -q[1];
+	conj[2] = -q[2];
+	conj[3] = -q[3];
+	// multiply tmp=pq*
+	__quaternion_multiply_array(p, conj, tmp);
+	// multiply p'=q*tmp
+	__quaternion_multiply_array(q, tmp, p);
+	return 0;
+}
+
+int __quaternion_rotate_vector_array(double v[3], double q[4])
+{
+	double vq[4];
+	//if (unlikely(v == NULL || q == NULL)) {
+	//	fprintf(stderr, "ERROR: in rc_quaternion_rotate_vector_array, received NULL pointer\n");
+	//	return -1;
+	//}
+	// duplicate v into a quaternion with 0 real part
+	vq[0] = 0.0;
+	vq[1] = v[0];
+	vq[2] = v[1];
+	vq[3] = v[2];
+	// rotate quaternion vector
+	__quaternion_rotate_array(vq, q);
+	// populate v with result
+	v[0] = vq[1];
+	v[1] = vq[2];
+	v[2] = vq[3];
+	return 0;
+}
+
 bool __update_from_mocap(mavlink_vision_position_estimate_t& buff_out, int mocap_ID, mocap_node_t& node)
 {
 	bool data_is_good = false;
@@ -1295,9 +1378,16 @@ bool __update_from_mocap(mavlink_vision_position_estimate_t& buff_out, int mocap
 	{
 		mavlink_vision_position_estimate_t tmp_2;
 		__copy_data(tmp_2, tmp);
+		double tmp_q[4] = { tmp.qw, tmp.qx, tmp.qy, tmp.qz };
+		double tmp_pos[3] = { tmp_2.x, tmp_2.y, tmp_2.z };
+		__quaternion_rotate_vector_array(tmp_pos, tmp_q);
+		tmp_2.x = tmp_pos[0];
+		tmp_2.y = tmp_pos[1];
+		tmp_2.z = tmp_pos[2];
 		if (!__is_vision_data_same(tmp_2, buff_out))
 		{
-			__copy_data(buff_out, tmp);
+			//__copy_data(buff_out, tmp);
+			buff_out = tmp_2;
 			data_is_good = true;
 		}
 #ifdef DEBUG

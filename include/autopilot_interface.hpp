@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Last Edit:  09/28/2022 (MM/DD/YYYY)
+ * Last Edit:  10/06/2022 (MM/DD/YYYY)
  *
  * Functions for sending and recieving commands to an autopilot via MAVlink
  */
@@ -267,6 +267,8 @@ public:
 
 	void enable_control(void);
 	void enable_mocap(void);
+	void toggle_mocap_YUP2NED(bool in);
+	void toggle_mocap_ZUP2NED(bool in);
 	void enable_telemetry(void);
 	void enable_vpe(void);
 	void enable_print_mocap(void);

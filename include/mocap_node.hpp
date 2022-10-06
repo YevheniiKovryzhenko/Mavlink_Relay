@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Last Edit:  09/28/2022 (MM/DD/YYYY)
+ * Last Edit:  10/05/2022 (MM/DD/YYYY)
  *
  * Functions to start and stop the optitrack mocap thread.
  */
@@ -55,10 +55,13 @@ class mocap_node_t
 public:
 	char reading_status;
 
-	bool YUP2END = true;
+	bool YUP2END;
+	bool ZUP2NED;
 
 	char start(std::string ip_addr);
 	char stop(void);
+	void togle_YUP2NED(bool in);
+	void togle_ZUP2NED(bool in);
 	char get_data(mocap_data_t& buff, int ID);
 
 	void start_read_thread(void);

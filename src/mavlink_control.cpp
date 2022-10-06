@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Last Edit:  09/28/2022 (MM/DD/YYYY)
+ * Last Edit:  10/05/2022 (MM/DD/YYYY)
  *
  * This process connects an external MAVLink UART device to send and receive data.
  */
@@ -42,8 +42,7 @@ bool termination_requested = false;
 // ------------------------------------------------------------------------------
 //   TOP
 // ------------------------------------------------------------------------------
-int
-top (int argc, char **argv)
+int top (int argc, char **argv)
 {
 
 	// --------------------------------------------------------------------------
@@ -67,6 +66,8 @@ top (int argc, char **argv)
 	settings.autotakeoff = false;
 
 	settings.enable_mocap = false;
+	settings.mocap_YUP2NED = false;
+	settings.mocap_ZUP2NED = false;
 	settings.mocap_ip = (char*)"127.0.0.1";
 	settings.mocap_ID = 1;
 
@@ -164,6 +165,8 @@ top (int argc, char **argv)
 		printf("Enabling mocap...\n");
 #endif // DEBUG
 		autopilot_interface.enable_mocap();
+		if (settings.mocap_YUP2NED)autopilot_interface.toggle_mocap_YUP2NED(true);
+		else if (settings.mocap_ZUP2NED)autopilot_interface.toggle_mocap_ZUP2NED(true);
 		if (settings.print_mocap) autopilot_interface.enable_print_mocap();
 		if (settings.enable_telemetry)
 		{
@@ -254,8 +257,7 @@ top (int argc, char **argv)
 //   COMMANDS
 // ------------------------------------------------------------------------------
 
-void
-commands(Autopilot_Interface &api, bool autotakeoff)
+void commands(Autopilot_Interface &api, bool autotakeoff)
 {
 
 	// --------------------------------------------------------------------------
@@ -444,6 +446,8 @@ void parse_commandline(int argc, char **argv, settings_t& settings)
 		"-t			--disable_telem\t\t	disable telemetry send/receive\t\tfalse\n"
 		"-m			--mocap_ip			specify mocap interface\t		127.0.0.1\n"
 		"-mI\t		--mocap_ID			specify frame ID from mocap\t	1\n"
+		"-mY\t		--mocap_YUP2NED\t		rotate from Y-Up to NED			false\n"
+		"-mZ\t		--mocap_ZUP2NED\t		rotate from Z-Up to NED			false\n"
 		"-pc\t		--print_control\t\t	print setpoints to console		false\n"
 		"-pm\t		--print_mocap\t		print mocap tracking			false\n"
 		"-pv\t		--print_vpe\t		print vision position estimate\t	false\n"
@@ -525,6 +529,24 @@ void parse_commandline(int argc, char **argv, settings_t& settings)
 				settings.enable_mocap = true;
 			}
 			else {
+				printf("%s\n", commandline_usage);
+				throw EXIT_FAILURE;
+			}
+		}
+		if (strcmp(argv[i], "-mY") == 0 || strcmp(argv[i], "--mocap_YUP2NED") == 0) {
+			settings.mocap_YUP2NED = true;
+			if (settings.mocap_ZUP2NED)
+			{
+				fprintf(stderr, "ERROR can only specify one rotation at a time\n");
+				printf("%s\n", commandline_usage);
+				throw EXIT_FAILURE;
+			}
+		}
+		if (strcmp(argv[i], "-mZ") == 0 || strcmp(argv[i], "--mocap_ZUP2NED") == 0) {
+			settings.mocap_ZUP2NED = true;
+			if (settings.mocap_YUP2NED)
+			{
+				fprintf(stderr, "ERROR can only specify one rotation at a time\n");
 				printf("%s\n", commandline_usage);
 				throw EXIT_FAILURE;
 			}

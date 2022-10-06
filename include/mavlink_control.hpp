@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Last Edit:  09/28/2022 (MM/DD/YYYY)
+ * Last Edit:  10/06/2022 (MM/DD/YYYY)
  *
  * This process connects an external MAVLink UART device to send and receive data.
  */
@@ -64,6 +64,8 @@ typedef struct settings_t
 	int udp_port;	
 	
 	bool enable_mocap;
+	bool mocap_YUP2NED;
+	bool mocap_ZUP2NED;
 	char* mocap_ip;
 	int mocap_ID;
 	

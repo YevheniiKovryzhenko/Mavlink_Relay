@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Last Edit:  09/28/2022 (MM/DD/YYYY)
+ * Last Edit:  10/05/2022 (MM/DD/YYYY)
  *
  * Functions to start and stop the optitrack mocap thread.
  */
@@ -124,27 +124,56 @@ void __copy_data(mocap_data_t& buff_out, optitrack_message_t& buff_in)
     return;
 }
 
-void __rotate2NED_YUP(optitrack_message_t& buff_in)
+void __rotate_YUP2NED(optitrack_message_t& buff_in)
 {
     optitrack_message_t tmp = buff_in;
 
+    //buff_in.x = tmp.x;
     buff_in.y = tmp.z;
     buff_in.z = -tmp.y;
 
+    //buff_in.qw = tmp.qw;
+    //buff_in.qx = tmp.qx;
     buff_in.qy = tmp.qz;
     buff_in.qz = -tmp.qy;
+    return;
+}
+
+void __rotate_ZUP2NED(optitrack_message_t& buff_in)
+{
+    optitrack_message_t tmp = buff_in;
+
+    //buff_in.x = tmp.x;
+    buff_in.y = -tmp.y;
+    buff_in.z = -tmp.z;
+
+    //buff_in.qw = tmp.qw;
+    //buff_in.qx = tmp.qx;
+    buff_in.qy = -tmp.qy;
+    buff_in.qz = -tmp.qz;
     return;
 }
 
 // ----------------------------------------------------------------------------------
 //   Time
 // ------------------- ---------------------------------------------------------------
-uint64_t
-get_time_usec()
+uint64_t get_time_usec()
 {
     static struct timeval _time_stamp;
     gettimeofday(&_time_stamp, NULL);
     return _time_stamp.tv_sec * 1000000 + _time_stamp.tv_usec;
+}
+
+/* check if MOCAP data is new */
+bool is_mocap_data_same(mocap_data_t& data_new, mocap_data_t& data_old)
+{
+    if (data_new.pitch != data_old.pitch) return false;
+    if (data_new.roll != data_old.roll) return false;
+    if (data_new.yaw != data_old.yaw) return false;
+    if (data_new.x != data_old.x) return false;
+    if (data_new.y != data_old.y) return false;
+    if (data_new.z != data_old.z) return false;
+    return true;
 }
 
 
@@ -340,7 +369,8 @@ char mocap_node_t::get_data(mocap_data_t& buff, int ID)
         if (msg.id == ID)
         {
             optitrack_message_t tmp_msg = msg;
-            if (YUP2END) __rotate2NED_YUP(tmp_msg);
+            if (YUP2END) __rotate_YUP2NED(tmp_msg);
+            else if (ZUP2NED) __rotate_ZUP2NED(tmp_msg);
             __copy_data(buff, tmp_msg);
             buff.time_us_old = time_us_old;
             buff.time_us = time_us;
@@ -356,18 +386,34 @@ char mocap_node_t::get_data(mocap_data_t& buff, int ID)
     return -1;
 }
 
-/* check if MOCAP data is new */
-bool is_mocap_data_same(mocap_data_t& data_new, mocap_data_t& data_old)
-{
-    if (data_new.pitch != data_old.pitch) return false;
-    if (data_new.roll != data_old.roll) return false;
-    if (data_new.yaw != data_old.yaw) return false;
-    if (data_new.x != data_old.x) return false;
-    if (data_new.y != data_old.y) return false;
-    if (data_new.z != data_old.z) return false;
-    return true;
-}
 
+/* toggle coordinate frame rotation */
+void mocap_node_t::togle_YUP2NED(bool in)
+{
+    if (in)
+    {
+        ZUP2NED = false;
+        YUP2END = true;
+    }
+    else
+    {
+        YUP2END = false;
+    }
+    return;
+}
+void mocap_node_t::togle_ZUP2NED(bool in)
+{
+    if (in)
+    {
+        ZUP2NED = true;
+        YUP2END = false;
+    }
+    else
+    {
+        ZUP2NED = false;
+    }
+    return;
+}
 
 
 // ------------------------------------------------------------------------------
