@@ -264,6 +264,7 @@ char serialib::openDevice(const char *Device, const unsigned int Bauds,
     case 57600 :    Speed=B57600; break;
     case 115200 :   Speed=B115200; break;
     case 230400:    Speed = B230400; break;
+    case 921600:    Speed = B921600; break;
     default : return -4;
     }
     int databits_flag = 0;

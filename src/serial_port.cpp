@@ -203,7 +203,8 @@ void Serial_Port::start()
 	// --------------------------------------------------------------------------
 	//   SETUP PORT
 	// --------------------------------------------------------------------------
-	if (serial.openDevice(uart_name, baudrate) < 0)
+	if (serial.openDevice(uart_name, baudrate,\
+		SERIAL_DATABITS_8, SERIAL_PARITY_NONE, SERIAL_STOPBITS_1) < 0)
 	{
 		printf("failure, could not configure port.\n");
 		throw EXIT_FAILURE;
