@@ -32,8 +32,10 @@
 //   Includes
 // ------------------------------------------------------------------------------
 
+#include <math.h>
 #include "autopilot_interface.hpp"
 #include "thread_defs.hpp"
+
 
 // terminal emulator control sequences
 #define WRAP_DISABLE	"\033[?7l"
@@ -298,186 +300,160 @@ void Autopilot_Interface::update_setpoint(mavlink_set_position_target_local_ned_
 void Autopilot_Interface::read_messages(void)
 {
 	bool success;               // receive success flag
-	bool received_all = false;  // receive only one message
 	Time_Stamps this_timestamps;
+	// ----------------------------------------------------------------------
+	//   READ MESSAGE
+	// ----------------------------------------------------------------------
+	mavlink_message_t message;
+	success = port->read_message(message);
 
-	// Blocking wait for new data
-	//while ( !received_all and !time_to_exit )
-	//{
-		// ----------------------------------------------------------------------
-		//   READ MESSAGE
-		// ----------------------------------------------------------------------
-		mavlink_message_t message;
-		success = port->read_message(message);
+	// ----------------------------------------------------------------------
+	//   HANDLE MESSAGE
+	// ----------------------------------------------------------------------
+	if (success)
+	{
 
-		// ----------------------------------------------------------------------
-		//   HANDLE MESSAGE
-		// ----------------------------------------------------------------------
-		if( success )
+		// Store message sysid and compid.
+		// Note this doesn't handle multiple message sources.
+		current_messages.sysid = message.sysid;
+		current_messages.compid = message.compid;
+
+		// Handle Message ID
+		switch (message.msgid)
 		{
 
-			// Store message sysid and compid.
-			// Note this doesn't handle multiple message sources.
-			current_messages.sysid  = message.sysid;
-			current_messages.compid = message.compid;
-
-			// Handle Message ID
-			switch (message.msgid)
-			{
-
-				case MAVLINK_MSG_ID_HEARTBEAT:
-				{
+		case MAVLINK_MSG_ID_HEARTBEAT:
+		{
 #ifdef DEBUG
-					printf("MAVLINK_MSG_ID_HEARTBEAT\n");
+			printf("MAVLINK_MSG_ID_HEARTBEAT\n");
 #endif // DEBUG
-					mavlink_msg_heartbeat_decode(&message, &(current_messages.heartbeat));
-					time_stamps_old.heartbeat = current_messages.time_stamps.heartbeat;
-					current_messages.time_stamps.heartbeat = get_time_usec();
-					this_timestamps.heartbeat = current_messages.time_stamps.heartbeat;
-					break;
-				}
+			mavlink_msg_heartbeat_decode(&message, &(current_messages.heartbeat));
+			time_stamps_old.heartbeat = current_messages.time_stamps.heartbeat;
+			current_messages.time_stamps.heartbeat = get_time_usec();
+			this_timestamps.heartbeat = current_messages.time_stamps.heartbeat;
+			break;
+		}
 
-				case MAVLINK_MSG_ID_SYS_STATUS:
-				{
+		case MAVLINK_MSG_ID_SYS_STATUS:
+		{
 #ifdef DEBUG
-					printf("MAVLINK_MSG_ID_SYS_STATUS\n");
+			printf("MAVLINK_MSG_ID_SYS_STATUS\n");
 #endif // DEBUG
-					mavlink_msg_sys_status_decode(&message, &(current_messages.sys_status));
-					time_stamps_old.sys_status = current_messages.time_stamps.sys_status;
-					current_messages.time_stamps.sys_status = get_time_usec();
-					this_timestamps.sys_status = current_messages.time_stamps.sys_status;
-					break;
-				}
+			mavlink_msg_sys_status_decode(&message, &(current_messages.sys_status));
+			time_stamps_old.sys_status = current_messages.time_stamps.sys_status;
+			current_messages.time_stamps.sys_status = get_time_usec();
+			this_timestamps.sys_status = current_messages.time_stamps.sys_status;
+			break;
+		}
 
-				case MAVLINK_MSG_ID_BATTERY_STATUS:
-				{
+		case MAVLINK_MSG_ID_BATTERY_STATUS:
+		{
 #ifdef DEBUG
-					printf("MAVLINK_MSG_ID_BATTERY_STATUS\n");
+			printf("MAVLINK_MSG_ID_BATTERY_STATUS\n");
 #endif // DEBUG
-					mavlink_msg_battery_status_decode(&message, &(current_messages.battery_status));
-					time_stamps_old.battery_status = current_messages.time_stamps.battery_status;
-					current_messages.time_stamps.battery_status = get_time_usec();
-					this_timestamps.battery_status = current_messages.time_stamps.battery_status;
-					break;
-				}
+			mavlink_msg_battery_status_decode(&message, &(current_messages.battery_status));
+			time_stamps_old.battery_status = current_messages.time_stamps.battery_status;
+			current_messages.time_stamps.battery_status = get_time_usec();
+			this_timestamps.battery_status = current_messages.time_stamps.battery_status;
+			break;
+		}
 
-				case MAVLINK_MSG_ID_RADIO_STATUS:
-				{
+		case MAVLINK_MSG_ID_RADIO_STATUS:
+		{
 #ifdef DEBUG
-					printf("MAVLINK_MSG_ID_RADIO_STATUS\n");
+			printf("MAVLINK_MSG_ID_RADIO_STATUS\n");
 #endif // DEBUG
-					mavlink_msg_radio_status_decode(&message, &(current_messages.radio_status));
-					time_stamps_old.radio_status = current_messages.time_stamps.radio_status;
-					current_messages.time_stamps.radio_status = get_time_usec();
-					this_timestamps.radio_status = current_messages.time_stamps.radio_status;
-					break;
-				}
+			mavlink_msg_radio_status_decode(&message, &(current_messages.radio_status));
+			time_stamps_old.radio_status = current_messages.time_stamps.radio_status;
+			current_messages.time_stamps.radio_status = get_time_usec();
+			this_timestamps.radio_status = current_messages.time_stamps.radio_status;
+			break;
+		}
 
-				case MAVLINK_MSG_ID_LOCAL_POSITION_NED:
-				{
+		case MAVLINK_MSG_ID_LOCAL_POSITION_NED:
+		{
 #ifdef DEBUG
-					printf("MAVLINK_MSG_ID_LOCAL_POSITION_NED\n");
+			printf("MAVLINK_MSG_ID_LOCAL_POSITION_NED\n");
 #endif // DEBUG
-					mavlink_msg_local_position_ned_decode(&message, &(current_messages.local_position_ned));
-					time_stamps_old.local_position_ned = current_messages.time_stamps.local_position_ned;
-					current_messages.time_stamps.local_position_ned = get_time_usec();
-					this_timestamps.local_position_ned = current_messages.time_stamps.local_position_ned;
-					break;
-				}
+			mavlink_msg_local_position_ned_decode(&message, &(current_messages.local_position_ned));
+			time_stamps_old.local_position_ned = current_messages.time_stamps.local_position_ned;
+			current_messages.time_stamps.local_position_ned = get_time_usec();
+			this_timestamps.local_position_ned = current_messages.time_stamps.local_position_ned;
+			break;
+		}
 
-				case MAVLINK_MSG_ID_GLOBAL_POSITION_INT:
-				{
+		case MAVLINK_MSG_ID_GLOBAL_POSITION_INT:
+		{
 #ifdef DEBUG
-					printf("MAVLINK_MSG_ID_GLOBAL_POSITION_INT\n");
+			printf("MAVLINK_MSG_ID_GLOBAL_POSITION_INT\n");
 #endif // DEBUG
-					mavlink_msg_global_position_int_decode(&message, &(current_messages.global_position_int));
-					time_stamps_old.global_position_int = current_messages.time_stamps.global_position_int;
-					current_messages.time_stamps.global_position_int = get_time_usec();
-					this_timestamps.global_position_int = current_messages.time_stamps.global_position_int;
-					break;
-				}
+			mavlink_msg_global_position_int_decode(&message, &(current_messages.global_position_int));
+			time_stamps_old.global_position_int = current_messages.time_stamps.global_position_int;
+			current_messages.time_stamps.global_position_int = get_time_usec();
+			this_timestamps.global_position_int = current_messages.time_stamps.global_position_int;
+			break;
+		}
 
-				case MAVLINK_MSG_ID_POSITION_TARGET_LOCAL_NED:
-				{
+		case MAVLINK_MSG_ID_POSITION_TARGET_LOCAL_NED:
+		{
 #ifdef DEBUG
-					printf("MAVLINK_MSG_ID_POSITION_TARGET_LOCAL_NED\n");
+			printf("MAVLINK_MSG_ID_POSITION_TARGET_LOCAL_NED\n");
 #endif // DEBUG
-					mavlink_msg_position_target_local_ned_decode(&message, &(current_messages.position_target_local_ned));
-					time_stamps_old.position_target_local_ned = current_messages.time_stamps.position_target_local_ned;
-					current_messages.time_stamps.position_target_local_ned = get_time_usec();
-					this_timestamps.position_target_local_ned = current_messages.time_stamps.position_target_local_ned;
-					break;
-				}
+			mavlink_msg_position_target_local_ned_decode(&message, &(current_messages.position_target_local_ned));
+			time_stamps_old.position_target_local_ned = current_messages.time_stamps.position_target_local_ned;
+			current_messages.time_stamps.position_target_local_ned = get_time_usec();
+			this_timestamps.position_target_local_ned = current_messages.time_stamps.position_target_local_ned;
+			break;
+		}
 
-				case MAVLINK_MSG_ID_POSITION_TARGET_GLOBAL_INT:
-				{
+		case MAVLINK_MSG_ID_POSITION_TARGET_GLOBAL_INT:
+		{
 #ifdef DEBUG
-					printf("MAVLINK_MSG_ID_POSITION_TARGET_GLOBAL_INT\n");
+			printf("MAVLINK_MSG_ID_POSITION_TARGET_GLOBAL_INT\n");
 #endif // DEBUG
-					mavlink_msg_position_target_global_int_decode(&message, &(current_messages.position_target_global_int));
-					time_stamps_old.position_target_global_int = current_messages.time_stamps.position_target_global_int;
-					current_messages.time_stamps.position_target_global_int = get_time_usec();
-					this_timestamps.position_target_global_int = current_messages.time_stamps.position_target_global_int;
-					break;
-				}
+			mavlink_msg_position_target_global_int_decode(&message, &(current_messages.position_target_global_int));
+			time_stamps_old.position_target_global_int = current_messages.time_stamps.position_target_global_int;
+			current_messages.time_stamps.position_target_global_int = get_time_usec();
+			this_timestamps.position_target_global_int = current_messages.time_stamps.position_target_global_int;
+			break;
+		}
 
-				case MAVLINK_MSG_ID_HIGHRES_IMU:
-				{
+		case MAVLINK_MSG_ID_HIGHRES_IMU:
+		{
 #ifdef DEBUG
-					printf("MAVLINK_MSG_ID_HIGHRES_IMU\n");
+			printf("MAVLINK_MSG_ID_HIGHRES_IMU\n");
 #endif // DEBUG
-					mavlink_msg_highres_imu_decode(&message, &(current_messages.highres_imu));
-					time_stamps_old.highres_imu = current_messages.time_stamps.highres_imu;
-					current_messages.time_stamps.highres_imu = get_time_usec();
-					this_timestamps.highres_imu = current_messages.time_stamps.highres_imu;
-					break;
-				}
+			mavlink_msg_highres_imu_decode(&message, &(current_messages.highres_imu));
+			time_stamps_old.highres_imu = current_messages.time_stamps.highres_imu;
+			current_messages.time_stamps.highres_imu = get_time_usec();
+			this_timestamps.highres_imu = current_messages.time_stamps.highres_imu;
+			break;
+		}
 
-				case MAVLINK_MSG_ID_ATTITUDE:
-				{
+		case MAVLINK_MSG_ID_ATTITUDE:
+		{
 #ifdef DEBUG
-					printf("MAVLINK_MSG_ID_ATTITUDE\n");
+			printf("MAVLINK_MSG_ID_ATTITUDE\n");
 #endif // DEBUG
-					mavlink_msg_attitude_decode(&message, &(current_messages.attitude));
-					time_stamps_old.attitude = current_messages.time_stamps.attitude;
-					current_messages.time_stamps.attitude = get_time_usec();
-					this_timestamps.attitude = current_messages.time_stamps.attitude;
-					break;
-				}
+			mavlink_msg_attitude_decode(&message, &(current_messages.attitude));
+			time_stamps_old.attitude = current_messages.time_stamps.attitude;
+			current_messages.time_stamps.attitude = get_time_usec();
+			this_timestamps.attitude = current_messages.time_stamps.attitude;
+			break;
+		}
 
-				default:
-				{
+		default:
+		{
 #ifdef DEBUG
-					printf("Warning, did not handle message id %i\n", message.msgid);
+			printf("Warning, did not handle message id %i\n", message.msgid);
 #endif // DEBUG
-					break;
-				}
+			break;
+		}
 
 
-			} // end: switch msgid
+		} // end: switch msgid
 
-		} // end: if read message
-
-		// Check for receipt of all items
-		//received_all =
-		//		this_timestamps.heartbeat                  &&
-//				this_timestamps.battery_status             &&
-//				this_timestamps.radio_status               &&
-//				this_timestamps.local_position_ned         &&
-//				this_timestamps.global_position_int        &&
-//				this_timestamps.position_target_local_ned  &&
-//				this_timestamps.position_target_global_int &&
-//				this_timestamps.highres_imu                &&
-//				this_timestamps.attitude                   &&
-		//		this_timestamps.sys_status
-		//		;
-		
-		// give the write thread time to use the port
-		//if ( writing_status > false ) {
-		//	usleep(100); // look for components of batches at 10kHz
-		//}
-
-	//} // end: while not received all
+	} // end: if read message
 
 	return;
 }
@@ -1293,101 +1269,26 @@ bool __is_vision_data_same(mavlink_vision_position_estimate_t& in1, mavlink_visi
 	return false;
 }
 
-int __quaternion_multiply_array(double a[4], double b[4], double c[4])
-{
-	//if (unlikely(a == NULL || b == NULL || c == NULL)) {
-	//	fprintf(stderr, "ERROR: in rc_quaternion_multiply_array, received NULL pointer\n");
-	//	return -1;
-	//}
-
-	int i, j;
-	double tmp[4][4];
-	// construct tmp matrix
-	tmp[0][0] = a[0];
-	tmp[0][1] = -a[1];
-	tmp[0][2] = -a[2];
-	tmp[0][3] = -a[3];
-	tmp[1][0] = a[1];
-	tmp[1][1] = a[0];
-	tmp[1][2] = -a[3];
-	tmp[1][3] = a[2];
-	tmp[2][0] = a[2];
-	tmp[2][1] = a[3];
-	tmp[2][2] = a[0];
-	tmp[2][3] = -a[1];
-	tmp[3][0] = a[3];
-	tmp[3][1] = -a[2];
-	tmp[3][2] = a[1];
-	tmp[3][3] = a[0];
-	// multiply
-	for (i = 0; i < 4; i++) {
-		c[i] = 0.0;
-		for (j = 0; j < 4; j++) c[i] += tmp[i][j] * b[j];
-	}
-	return 0;
-}
-
-int __quaternion_rotate_array(double p[4], double q[4])
-{
-	double conj[4], tmp[4];
-	//if (unlikely(p == NULL || q == NULL)) {
-	//	fprintf(stderr, "ERROR: in rc_quaternion_rotate_array, received NULL pointer\n");
-	//	return -1;
-	//}
-	// make a conjugate of q
-	conj[0] = q[0];
-	conj[1] = -q[1];
-	conj[2] = -q[2];
-	conj[3] = -q[3];
-	// multiply tmp=pq*
-	__quaternion_multiply_array(p, conj, tmp);
-	// multiply p'=q*tmp
-	__quaternion_multiply_array(q, tmp, p);
-	return 0;
-}
-
-int __quaternion_rotate_vector_array(double v[3], double q[4])
-{
-	double vq[4];
-	//if (unlikely(v == NULL || q == NULL)) {
-	//	fprintf(stderr, "ERROR: in rc_quaternion_rotate_vector_array, received NULL pointer\n");
-	//	return -1;
-	//}
-	// duplicate v into a quaternion with 0 real part
-	vq[0] = 0.0;
-	vq[1] = v[0];
-	vq[2] = v[1];
-	vq[3] = v[2];
-	// rotate quaternion vector
-	__quaternion_rotate_array(vq, q);
-	// populate v with result
-	v[0] = vq[1];
-	v[1] = vq[2];
-	v[2] = vq[3];
-	return 0;
-}
-
-bool __update_from_mocap(mavlink_vision_position_estimate_t& buff_out, int mocap_ID, mocap_node_t& node)
+bool __update_from_mocap(mavlink_vision_position_estimate_t& buff_out, int mocap_ID, mocap_node_t& node, bool& _time_to_exit)
 {
 	bool data_is_good = false;
-	
+
 	//get the data from mocap
-	mocap_data_t tmp;	
+	mocap_data_t tmp;
 	node.get_data(tmp, mocap_ID);
 	if (tmp.trackingValid) //check if tracking was done properly
 	{
 		mavlink_vision_position_estimate_t tmp_2;
 		__copy_data(tmp_2, tmp);
-		double tmp_q[4] = { tmp.qw, tmp.qx, tmp.qy, tmp.qz };
-		double tmp_pos[3] = { tmp_2.x, tmp_2.y, tmp_2.z };
-		__quaternion_rotate_vector_array(tmp_pos, tmp_q);
-		tmp_2.x = tmp_pos[0];
-		tmp_2.y = tmp_pos[1];
-		tmp_2.z = tmp_pos[2];
 		if (!__is_vision_data_same(tmp_2, buff_out))
 		{
-			//__copy_data(buff_out, tmp);
-			buff_out = tmp_2;
+			buff_out.usec = tmp_2.usec;
+			buff_out.x = tmp_2.x;
+			buff_out.y = tmp_2.y;
+			buff_out.z = tmp_2.z;
+			buff_out.roll = tmp_2.roll;
+			buff_out.pitch = tmp_2.pitch;
+			buff_out.yaw = tmp_2.yaw;
 			data_is_good = true;
 		}
 #ifdef DEBUG
@@ -1397,7 +1298,6 @@ bool __update_from_mocap(mavlink_vision_position_estimate_t& buff_out, int mocap
 		}
 #endif // DEBUG		
 	}
-	
 	return data_is_good;
 }
 
@@ -1411,10 +1311,10 @@ void Autopilot_Interface::vision_position_estimate_write_thread(void)
 
 	// prepare an initial setpoint, just stay put
 	mavlink_vision_position_estimate_t vpe;
-	vpe.covariance[0] = NAN;
+	for (int i = 0; i < 21; i++) vpe.covariance[i] = 0;
 
 	//get the data from mocap
-	while (!__update_from_mocap(vpe, mocap_ID, mocap));
+	while (!__update_from_mocap(vpe, mocap_ID, mocap, time_to_exit));
 	// set vision position estimate
 	{
 		std::lock_guard<std::mutex> lock(current_vision_position_estimate.mutex);
@@ -1430,21 +1330,22 @@ void Autopilot_Interface::vision_position_estimate_write_thread(void)
 	//The messages should be streamed at between 30Hz(if containing covariances) and 50 Hz.
 	//If the message rate is too low, EKF2 will not fuse the external vision messages.
 	bool tmp = false;
+	uint64_t tmp_time_old;
 	while (!time_to_exit)
-	{
-		uint64_t tmp_time_old;
+	{		
 		tmp = false;
 		{
 			std::lock_guard<std::mutex> lock(current_vision_position_estimate.mutex);
 			tmp_time_old = current_vision_position_estimate.data.usec;
-			tmp = __update_from_mocap(current_vision_position_estimate.data, mocap_ID, mocap);
+			tmp = __update_from_mocap(current_vision_position_estimate.data, mocap_ID, mocap, time_to_exit);
 			if (tmp) current_vision_position_estimate.time_us_old = tmp_time_old;
 		}
 		if (tmp)
-		{			
+		{
 			write_vision_position_estimate();
 			usleep(1E6 / VPE_THREAD_HZ);   // Stream at 50Hz
-		}		
+		}
+		else usleep(100);
 	}
 
 	// signal end
