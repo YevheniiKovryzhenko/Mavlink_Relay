@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Last Edit:  10/06/2022 (MM/DD/YYYY)
+ * Last Edit:  10/07/2022 (MM/DD/YYYY)
  *
  * This process connects an external MAVLink UART device to send and receive data.
  */
@@ -60,8 +60,9 @@ typedef struct settings_t
 	int baudrate;
 
 	bool use_udp;
-	char* udp_ip;
-	int udp_port;	
+	char* target_ip;
+	int target_port;
+	int local_port;
 	
 	bool enable_mocap;
 	bool mocap_YUP2NED;
@@ -94,5 +95,4 @@ void parse_commandline(int argc, char** argv, settings_t& settings);
 Autopilot_Interface *autopilot_interface_quit;
 Generic_Port *port_quit;
 void quit_handler( int sig );
-void quit_handler_no_control(int sig);
 

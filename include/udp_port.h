@@ -103,17 +103,18 @@ class UDP_Port: public Generic_Port
 public:
 
 	UDP_Port();
-	UDP_Port(const char *target_ip_, int udp_port_);
+	UDP_Port(const char *target_ip_, int targetPort_, int localPort_);
 	virtual ~UDP_Port();
 
-	int read_message(mavlink_message_t &message);
+	char read_message(mavlink_message_t &message);
 	int write_message(const mavlink_message_t &message);
 
 	bool is_running(){
 		return is_open;
 	}
-	void start();
+	char start();
 	void stop();
+	bool is_available(void);
 
 private:
 
@@ -122,16 +123,23 @@ private:
 
 	void initialize_defaults();
 
-	const static int BUFF_LEN=2041;
-	char buff[BUFF_LEN];
+	const static int BUFF_LEN = 2041;
+	uint8_t buff[BUFF_LEN];
 	int buff_ptr;
 	int buff_len;
-	bool debug;
-	const char *target_ip;
-	int rx_port;
-	int tx_port;
+	const char *target_ip = "127.0.0.1";
+	
 	int sock;
 	bool is_open;
+
+	struct sockaddr_in target_addr;
+	struct sockaddr_in local_addr;
+	uint16_t local_port;
+	uint16_t target_port;
+	socklen_t fromlen = sizeof(target_addr);
+	int bytes_sent;
+	//uint16_t len;
+	
 
 	int  _read_port(uint8_t &cp);
 	int _write_port(char *buf, unsigned len);

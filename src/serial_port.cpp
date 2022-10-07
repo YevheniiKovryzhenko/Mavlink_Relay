@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Last Edit:  09/28/2022 (MM/DD/YYYY)
+ * Last Edit:  10/07/2022 (MM/DD/YYYY)
  *
  * Functions for opening, closing, reading and writing via serial ports.
  */
@@ -87,10 +87,8 @@ initialize_defaults()
 // ------------------------------------------------------------------------------
 //   Read from Serial
 // ------------------------------------------------------------------------------
-int Serial_Port::read_message(mavlink_message_t &message)
-{
-	uint8_t          cp;
-	mavlink_status_t status;
+char Serial_Port::read_message(mavlink_message_t &message)
+{	
 	uint8_t          msgReceived = false;
 
 	// --------------------------------------------------------------------------
@@ -100,6 +98,8 @@ int Serial_Port::read_message(mavlink_message_t &message)
 	// this function locks the port during read
 	if (serial.available())
 	{
+		uint8_t          cp;
+		mavlink_status_t status;
 		int result = _read_port(cp);
 
 
@@ -109,7 +109,7 @@ int Serial_Port::read_message(mavlink_message_t &message)
 		if (result > 0)
 		{
 			// the parsing
-			msgReceived = mavlink_parse_char(MAVLINK_COMM_1, cp, &message, &status);
+			msgReceived = mavlink_parse_char(MAVLINK_COMM_0, cp, &message, &status);
 
 			// check for dropped packets
 			if ((lastStatus.packet_rx_drop_count != status.packet_rx_drop_count) && debug)
@@ -168,9 +168,7 @@ int Serial_Port::read_message(mavlink_message_t &message)
 // ------------------------------------------------------------------------------
 //   Write to Serial
 // ------------------------------------------------------------------------------
-int
-Serial_Port::
-write_message(const mavlink_message_t &message)
+int Serial_Port::write_message(const mavlink_message_t &message)
 {
 	char buf[300];
 
@@ -190,7 +188,7 @@ write_message(const mavlink_message_t &message)
 /**
  * throws EXIT_FAILURE if could not open the port
  */
-void Serial_Port::start()
+char Serial_Port::start()
 {
 
 	// --------------------------------------------------------------------------
@@ -203,11 +201,11 @@ void Serial_Port::start()
 	// --------------------------------------------------------------------------
 	//   SETUP PORT
 	// --------------------------------------------------------------------------
-	if (serial.openDevice(uart_name, baudrate,\
+	if (serial.openDevice(uart_name, baudrate, \
 		SERIAL_DATABITS_8, SERIAL_PARITY_NONE, SERIAL_STOPBITS_1) < 0)
 	{
-		printf("failure, could not configure port.\n");
-		throw EXIT_FAILURE;
+		fprintf(stderr, "ERROR in start: failed to configure port %s with baudrate %i.\n", uart_name, baudrate);
+		return -1;
 	}
 	serial.flushReceiver();
 
@@ -221,7 +219,7 @@ void Serial_Port::start()
 
 	printf("\n");
 
-	return;
+	return 0;
 
 }
 

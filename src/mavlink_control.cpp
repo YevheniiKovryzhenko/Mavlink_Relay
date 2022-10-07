@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Last Edit:  10/05/2022 (MM/DD/YYYY)
+ * Last Edit:  10/07/2022 (MM/DD/YYYY)
  *
  * This process connects an external MAVLink UART device to send and receive data.
  */
@@ -61,8 +61,10 @@ int top (int argc, char **argv)
 	settings.baudrate = 57600;
 
 	settings.use_udp = false;
-	settings.udp_ip = (char*)"127.0.0.1";
-	settings.udp_port = 14540;
+	settings.target_ip = (char*)"127.0.0.1";
+	settings.target_port = 14555;
+	settings.local_port = 14550;
+
 	settings.autotakeoff = false;
 
 	settings.enable_mocap = false;
@@ -99,7 +101,7 @@ int top (int argc, char **argv)
 
 	if (settings.use_udp)
 	{
-		port = new UDP_Port(settings.udp_ip, settings.udp_port);
+		port = new UDP_Port(settings.target_ip, settings.target_port, settings.local_port);
 	}
 	else
 	{
@@ -110,7 +112,7 @@ int top (int argc, char **argv)
 	* Instantiate an autopilot interface object
 	*
 	* This starts two threads for read and write over MAVlink. The read thread
-	* listens for any MAVlink message and pushes it to the current_messages
+	* listens for any MAVlink message and pushes it to the current_RX_messages
 	* attribute.  The write thread at the moment only streams a position target
 	* in the local NED frame (mavlink_set_position_target_local_ned_t), which
 	* is changed by using the method update_setpoint().  Sending these messages
@@ -123,37 +125,20 @@ int top (int argc, char **argv)
 	*/
 	Autopilot_Interface autopilot_interface(port, settings.mocap_ip, settings.mocap_ID);
 
-	if (settings.enable_control)
-	{
-		autopilot_interface.enable_control();
+	if (settings.enable_control) autopilot_interface.enable_control();
 
-		/*
-		 * Setup interrupt signal handler
-		 *
-		 * Responds to early exits signaled with Ctrl-C.  The handler will command
-		 * to exit offboard mode if required, and close threads and the port.
-		 * The handler in this example needs references to the above objects.
-		 *
-		 */
-		port_quit = port;
-		autopilot_interface_quit = &autopilot_interface;
-		signal(SIGINT, quit_handler);
-	}
-	else
-	{
-		/*
-		 * Setup interrupt signal handler
-		 *
-		 * Responds to early exits signaled with Ctrl-C.  The handler will command
-		 * to exit offboard mode if required, and close threads and the port.
-		 * The handler in this example needs references to the above objects.
-		 *
-		 */
-		port_quit = port;
-		autopilot_interface_quit = &autopilot_interface;
-		signal(SIGINT, quit_handler_no_control);
+	/*
+	* Setup interrupt signal handler
+	*
+	* Responds to early exits signaled with Ctrl-C.  The handler will command
+	* to exit offboard mode if required, and close threads and the port.
+	* The handler in this example needs references to the above objects.
+	*
+	*/
+	port_quit = port;
+	autopilot_interface_quit = &autopilot_interface;
+	signal(SIGINT, quit_handler);
 
-	}
 #ifdef DEBUG
 	printf("quit handler started\n");
 #endif // DEBUG
@@ -310,7 +295,7 @@ void commands(Autopilot_Interface &api, bool autotakeoff)
 	// Wait for 8 seconds, check position
 	for (int i=0; i < 8; i++)
 	{
-		mavlink_local_position_ned_t pos = api.current_messages.local_position_ned;
+		mavlink_local_position_ned_t pos = api.current_RX_messages.local_position_ned;
 #ifdef DEBUG
 		printf("%i CURRENT POSITION XYZ = [ % .4f , % .4f , % .4f ] \n", i, pos.x, pos.y, pos.z);
 #endif // DEBUG		
@@ -335,7 +320,7 @@ void commands(Autopilot_Interface &api, bool autotakeoff)
 	// Wait for 4 seconds, check position
 	for (int i=0; i < 4; i++)
 	{
-		mavlink_local_position_ned_t pos = api.current_messages.local_position_ned;
+		mavlink_local_position_ned_t pos = api.current_RX_messages.local_position_ned;
 #ifdef DEBUG
 		printf("%i CURRENT POSITION XYZ = [ % .4f , % .4f , % .4f ] \n", i, pos.x, pos.y, pos.z);
 #endif // DEBUG		
@@ -359,7 +344,7 @@ void commands(Autopilot_Interface &api, bool autotakeoff)
 		// Wait for 8 seconds, check position
 		for (int i=0; i < 8; i++)
 		{
-			mavlink_local_position_ned_t pos = api.current_messages.local_position_ned;
+			mavlink_local_position_ned_t pos = api.current_RX_messages.local_position_ned;
 #ifdef DEBUG
 			printf("%i CURRENT POSITION XYZ = [ % .4f , % .4f , % .4f ] \n", i, pos.x, pos.y, pos.z);
 #endif // DEBUG			
@@ -391,7 +376,7 @@ void commands(Autopilot_Interface &api, bool autotakeoff)
 #endif // DEBUG	
 
 	// copy current messages
-	Mavlink_Messages messages = api.current_messages;
+	Mavlink_Messages messages = api.current_RX_messages;
 
 	// local position in ned frame
 	mavlink_local_position_ned_t pos = messages.local_position_ned;
@@ -490,7 +475,7 @@ void parse_commandline(int argc, char **argv, settings_t& settings)
 		if (strcmp(argv[i], "-u") == 0 || strcmp(argv[i], "--udp_ip") == 0) {
 			if (argc > i + 1) {
 				i++;
-				settings.udp_ip = argv[i];
+				settings.target_ip = argv[i];
 				settings.use_udp = true;
 			} else {
 				printf("%s\n",commandline_usage);
@@ -502,7 +487,8 @@ void parse_commandline(int argc, char **argv, settings_t& settings)
 		if (strcmp(argv[i], "-p") == 0 || strcmp(argv[i], "--port") == 0) {
 			if (argc > i + 1) {
 				i++;
-				settings.udp_port = atoi(argv[i]);
+				settings.target_port = atoi(argv[i]);
+				settings.use_udp = true;
 			} else {
 				printf("%s\n",commandline_usage);
 				throw EXIT_FAILURE;
@@ -594,7 +580,7 @@ void parse_commandline(int argc, char **argv, settings_t& settings)
 void quit_handler( int sig )
 {
 	printf("\n");
-	printf("Detected ctrl+c, terminating the program...\n");
+	printf("WARNING: Detected ctrl+c, terminating the program...\n");
 	printf("\n");
 	termination_requested = true;
 
@@ -610,42 +596,16 @@ void quit_handler( int sig )
 	}
 	catch (int error){}
 
+	delete port_quit;
 	// end program here
 	exit(0);
-
-}
-void quit_handler_no_control(int sig)
-{
-#ifdef DEBUG
-	printf("\n");
-	printf("TERMINATING AT USER REQUEST\n");
-	printf("\n");
-#endif // DEBUG
-	termination_requested = true;
-
-	// autopilot interface
-	try {
-		autopilot_interface_quit->handle_quit_no_control(sig);
-	}
-	catch (int error) {}
-
-	// port
-	try {
-		port_quit->stop();
-	}
-	catch (int error) {}
-
-	// end program here
-	exit(0);
-
 }
 
 
 // ------------------------------------------------------------------------------
 //   Main
 // ------------------------------------------------------------------------------
-int
-main(int argc, char **argv)
+int main(int argc, char **argv)
 {
 	// This program uses throw, wrap one big try/catch here
 	try

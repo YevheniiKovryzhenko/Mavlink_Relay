@@ -115,6 +115,7 @@ void* start_autopilot_interface_read_thread(void *args);
 void* start_autopilot_interface_write_thread(void *args);
 void* start_autopilot_interface_write_vision_position_estimate_thread(void* args);
 void* start_autopilot_interface_printf_thread(void* args);
+void* start_autopilot_interface_sys_thread(void* args);
 
 // ------------------------------------------------------------------------------
 //   Data Structures
@@ -138,6 +139,7 @@ struct Time_Stamps
 	uint64_t highres_imu;
 	uint64_t attitude;
 	uint64_t vision_position_estimate;
+	uint64_t odometry;
 
 	void
 	reset_timestamps()
@@ -197,15 +199,17 @@ struct Mavlink_Messages {
 
 	// Vision position and attitude estimate
 	mavlink_vision_position_estimate_t vision_position_estimate;
-	// System Parameters?
+
+	// Odometry
+	mavlink_odometry_t odometry;
 	
+	// System Parameters?
 
 
 	// Time Stamps
 	Time_Stamps time_stamps;
 
-	void
-	reset_timestamps()
+	void reset_timestamps()
 	{
 		time_stamps.reset_timestamps();
 	}
@@ -220,7 +224,7 @@ struct Mavlink_Messages {
  * Autopilot Interface Class
  *
  * This starts two threads for read and write over MAVlink. The read thread
- * listens for any MAVlink message and pushes it to the current_messages
+ * listens for any MAVlink message and pushes it to the current_RX_messages
  * attribute.  The write thread at the moment only streams a position target
  * in the local NED frame (mavlink_set_position_target_local_ned_t), which
  * is changed by using the method update_setpoint().  Sending these messages
@@ -242,6 +246,7 @@ public:
 
 	char printf_status;
 	char vision_position_writing_status;
+	char sys_status;
 	char reading_status;
 	char writing_status;
 	char control_status;
@@ -251,7 +256,8 @@ public:
 	int autopilot_id;
 	int companion_id;	
 
-	Mavlink_Messages current_messages;
+	Mavlink_Messages current_RX_messages;
+	Mavlink_Messages current_TX_messages;
 	mavlink_set_position_target_local_ned_t initial_position;
 
 	void update_setpoint(mavlink_set_position_target_local_ned_t setpoint);
@@ -280,12 +286,14 @@ public:
 	void start_read_thread(void);
 	void start_write_thread(void);
 	void start_printf_thread(void);
+	void start_sys_thread(void);
 
 	void handle_quit( int sig );
-	void handle_quit_no_control(int sig);
-
 
 private:
+	void init(Generic_Port* port_);
+	void init(Generic_Port* port_, std::string ip_addr_mocap_, int mocap_ID_);
+
 	bool enable_mocap_fl = false;
 	bool enable_vpe_fl = false;
 	bool enable_control_fl = false;
@@ -310,6 +318,7 @@ private:
 	thread_gen_t write_tid;
 	thread_gen_t vision_position_estimate_write_tid;
 	thread_gen_t printf_tid;
+	thread_gen_t sys_tid;
 
 	struct {
 		std::mutex mutex;
@@ -327,10 +336,12 @@ private:
 	void write_thread(void);
 	void vision_position_estimate_write_thread(void);
 	void printf_thread(void);
+	void sys_thread(void);
 
 	int toggle_offboard_control( bool flag );
 	void write_setpoint();
 	void write_vision_position_estimate();
+	void sys_write(void);
 	void print_header(void);
 	void print_data(void);
 };

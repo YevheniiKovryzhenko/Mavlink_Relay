@@ -1,5 +1,5 @@
 /*
- * mocap_node.hpp
+ * tools.cpp
  *
  * Author:	Yevhenii Kovryzhenko, Department of Aerospace Engineering, Auburn University.
  * Contact: yzk0058@auburn.edu
@@ -22,69 +22,58 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Last Edit:  10/05/2022 (MM/DD/YYYY)
+ * Last Edit:  10/07/2022 (MM/DD/YYYY)
  *
- * Functions to start and stop the optitrack mocap thread.
  */
 
-#ifndef MOCAP_NODE_HPP
-#define MOCAP_NODE_HPP
-#include <pthread.h> // This uses POSIX Threads
-#include <unistd.h> // for socklen_t
-#include <sys/socket.h> // for sockaddr
-#include <mutex>
-#include "optitrack.hpp"
-#include "thread_gen.hpp"
+#include "tools.hpp"
 
-class mocap_data_t:public optitrack_message_t
+
+#if (defined __QNX__) | (defined __QNXNTO__)
+/* QNX specific headers */
+#include <unix.h>
+#else
+/* Linux / MacOS POSIX timer headers */
+#include <sys/time.h>
+#include <time.h>
+#include <arpa/inet.h>
+#include <stdbool.h> /* required for the definition of bool in C99 */
+#endif
+
+
+// ----------------------------------------------------------------------------------
+//   Time
+// ------------------- ---------------------------------------------------------------
+
+/* QNX timer version */
+#if (defined __QNX__) | (defined __QNXNTO__)
+uint64_t get_time_usec(void)
 {
-public:
-	uint64_t time_us_old;
-	uint64_t time_us;
-	double roll;
-	double pitch;
-	double yaw;
-private:
-};
 
+	struct timespec time;
 
-class mocap_node_t
+	clock_gettime(CLOCK_REALTIME, &time);
+
+	return (uint64_t)time.tv_sec * 1000000 + time.tv_nsec / 1000;
+}
+#else
+uint64_t get_time_usec(void)
 {
-public:
-	char reading_status;
 
-	bool YUP2END;
-	bool ZUP2NED;
+	struct timeval tv;
 
-	char start(std::string ip_addr);
-	char stop(void);
-	void togle_YUP2NED(bool in);
-	void togle_ZUP2NED(bool in);
-	char get_data(mocap_data_t& buff, int ID);
+	gettimeofday(&tv, NULL);
 
-	void start_read_thread(void);
+	return ((uint64_t)tv.tv_sec) * 1000000 + tv.tv_usec;
+}
+#endif
 
-	mocap_node_t();
-	~mocap_node_t();
-private:
-	uint64_t time_us;
-	uint64_t time_us_old;
-	pthread_mutex_t  lock;
-	thread_gen_t thread;
-	bool time_to_exit;
+uint64_t get_dt_us(uint64_t last_time)
+{
+	return get_time_usec() - last_time;
+}
 
-	const static int BUFF_LEN = 20000;
-	char buff[BUFF_LEN];
-
-	SOCKET dataSocket = 0;
-	socklen_t ADDRLEN = sizeof(sockaddr);	
-	std::vector<optitrack_message_t> incomingMessages;	
-
-	
-	char init(std::string ip_addr);	
-	void read_messages(void);
-	char march(void);
-	void read_thread(void);
-};
-
-#endif  //MOCAP_NODE_HPP
+double get_dt_s(uint64_t last_time)
+{
+	return (double)get_dt_us(last_time) / 1000000.0;
+}

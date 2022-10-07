@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Last Edit:  10/05/2022 (MM/DD/YYYY)
+ * Last Edit:  10/07/2022 (MM/DD/YYYY)
  *
  * Functions to start and stop the optitrack mocap thread.
  */
@@ -59,13 +59,9 @@
 #include "optitrack_channels.h"
 #include "optitrack.hpp"
 #include "thread_defs.hpp"
+#include "tools.hpp"
 
 //#define DEBUG
-
-static uint64_t __get_dt_us(uint64_t last_time)
-{
-    return get_time_usec() - last_time;
-}
 
 void __copy_data(mocap_data_t& buff_out, mocap_data_t& buff_in)
 {
@@ -152,16 +148,6 @@ void __rotate_ZUP2NED(optitrack_message_t& buff_in)
     buff_in.qy = -tmp.qy;
     buff_in.qz = -tmp.qz;
     return;
-}
-
-// ----------------------------------------------------------------------------------
-//   Time
-// ------------------- ---------------------------------------------------------------
-uint64_t get_time_usec()
-{
-    static struct timeval _time_stamp;
-    gettimeofday(&_time_stamp, NULL);
-    return _time_stamp.tv_sec * 1000000 + _time_stamp.tv_usec;
 }
 
 /* check if MOCAP data is new */

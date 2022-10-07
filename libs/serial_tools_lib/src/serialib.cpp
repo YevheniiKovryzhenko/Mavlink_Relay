@@ -134,15 +134,15 @@ void serialib::sync(void)
      \return -8 Stopbits not recognized
      \return -9 Parity not recognized
   */
-char serialib::openDevice(const char *Device, const unsigned int Bauds,
-                          SerialDataBits Databits,
-                          SerialParity Parity,
-                          SerialStopBits Stopbits) {
+char serialib::openDevice(const char* Device, const unsigned int Bauds,
+    SerialDataBits Databits,
+    SerialParity Parity,
+    SerialStopBits Stopbits) {
 #if defined (_WIN32) || defined( _WIN64)
     // Open serial port
-    hSerial = CreateFileA(Device,GENERIC_READ | GENERIC_WRITE,0,0,OPEN_EXISTING,/*FILE_ATTRIBUTE_NORMAL*/0,0);
-    if(hSerial==INVALID_HANDLE_VALUE) {
-        if(GetLastError()==ERROR_FILE_NOT_FOUND)
+    hSerial = CreateFileA(Device, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING,/*FILE_ATTRIBUTE_NORMAL*/0, 0);
+    if (hSerial == INVALID_HANDLE_VALUE) {
+        if (GetLastError() == ERROR_FILE_NOT_FOUND)
             return -1; // Device not found
 
         // Error while opening the device
@@ -153,7 +153,7 @@ char serialib::openDevice(const char *Device, const unsigned int Bauds,
 
     // Structure for the port parameters
     DCB dcbSerialParams;
-    dcbSerialParams.DCBlength=sizeof(dcbSerialParams);
+    dcbSerialParams.DCBlength = sizeof(dcbSerialParams);
 
     // Get the port parameters
     if (!GetCommState(hSerial, &dcbSerialParams)) return -3;
@@ -161,48 +161,50 @@ char serialib::openDevice(const char *Device, const unsigned int Bauds,
     // Set the speed (Bauds)
     switch (Bauds)
     {
-    case 110  :     dcbSerialParams.BaudRate=CBR_110; break;
-    case 300  :     dcbSerialParams.BaudRate=CBR_300; break;
-    case 600  :     dcbSerialParams.BaudRate=CBR_600; break;
-    case 1200 :     dcbSerialParams.BaudRate=CBR_1200; break;
-    case 2400 :     dcbSerialParams.BaudRate=CBR_2400; break;
-    case 4800 :     dcbSerialParams.BaudRate=CBR_4800; break;
-    case 9600 :     dcbSerialParams.BaudRate=CBR_9600; break;
-    case 14400 :    dcbSerialParams.BaudRate=CBR_14400; break;
-    case 19200 :    dcbSerialParams.BaudRate=CBR_19200; break;
-    case 38400 :    dcbSerialParams.BaudRate=CBR_38400; break;
-    case 56000 :    dcbSerialParams.BaudRate=CBR_56000; break;
-    case 57600 :    dcbSerialParams.BaudRate=CBR_57600; break;
-    case 115200 :   dcbSerialParams.BaudRate=CBR_115200; break;
-    case 128000 :   dcbSerialParams.BaudRate=CBR_128000; break;
-    case 256000 :   dcbSerialParams.BaudRate=CBR_256000; break;
-    default : return -4;
+    case 110:     dcbSerialParams.BaudRate = CBR_110; break;
+    case 300:     dcbSerialParams.BaudRate = CBR_300; break;
+    case 600:     dcbSerialParams.BaudRate = CBR_600; break;
+    case 1200:     dcbSerialParams.BaudRate = CBR_1200; break;
+    case 2400:     dcbSerialParams.BaudRate = CBR_2400; break;
+    case 4800:     dcbSerialParams.BaudRate = CBR_4800; break;
+    case 9600:     dcbSerialParams.BaudRate = CBR_9600; break;
+    case 14400:    dcbSerialParams.BaudRate = CBR_14400; break;
+    case 19200:    dcbSerialParams.BaudRate = CBR_19200; break;
+    case 38400:    dcbSerialParams.BaudRate = CBR_38400; break;
+    case 56000:    dcbSerialParams.BaudRate = CBR_56000; break;
+    case 57600:    dcbSerialParams.BaudRate = CBR_57600; break;
+    case 115200:   dcbSerialParams.BaudRate = CBR_115200; break;
+    case 128000:   dcbSerialParams.BaudRate = CBR_128000; break;
+    case 256000:   dcbSerialParams.BaudRate = CBR_256000; break;
+    default:
+        fprintf(stderr, "ERROR in openDevice: unsupported baudrate\n");
+        return -4;
     }
     //select data size
     BYTE bytesize = 0;
-    switch(Databits) {
-        case SERIAL_DATABITS_5: bytesize = 5; break;
-        case SERIAL_DATABITS_6: bytesize = 6; break;
-        case SERIAL_DATABITS_7: bytesize = 7; break;
-        case SERIAL_DATABITS_8: bytesize = 8; break;
-        case SERIAL_DATABITS_16: bytesize = 16; break;
-        default: return -7;
+    switch (Databits) {
+    case SERIAL_DATABITS_5: bytesize = 5; break;
+    case SERIAL_DATABITS_6: bytesize = 6; break;
+    case SERIAL_DATABITS_7: bytesize = 7; break;
+    case SERIAL_DATABITS_8: bytesize = 8; break;
+    case SERIAL_DATABITS_16: bytesize = 16; break;
+    default: return -7;
     }
     BYTE stopBits = 0;
-    switch(Stopbits) {
-        case SERIAL_STOPBITS_1: stopBits = ONESTOPBIT; break;
-        case SERIAL_STOPBITS_1_5: stopBits = ONE5STOPBITS; break;
-        case SERIAL_STOPBITS_2: stopBits = TWOSTOPBITS; break;
-        default: return -8;
+    switch (Stopbits) {
+    case SERIAL_STOPBITS_1: stopBits = ONESTOPBIT; break;
+    case SERIAL_STOPBITS_1_5: stopBits = ONE5STOPBITS; break;
+    case SERIAL_STOPBITS_2: stopBits = TWOSTOPBITS; break;
+    default: return -8;
     }
     BYTE parity = 0;
-    switch(Parity) {
-        case SERIAL_PARITY_NONE: parity = NOPARITY; break;
-        case SERIAL_PARITY_EVEN: parity = EVENPARITY; break;
-        case SERIAL_PARITY_ODD: parity = ODDPARITY; break;
-        case SERIAL_PARITY_MARK: parity = MARKPARITY; break;
-        case SERIAL_PARITY_SPACE: parity = SPACEPARITY; break;
-        default: return -9;
+    switch (Parity) {
+    case SERIAL_PARITY_NONE: parity = NOPARITY; break;
+    case SERIAL_PARITY_EVEN: parity = EVENPARITY; break;
+    case SERIAL_PARITY_ODD: parity = ODDPARITY; break;
+    case SERIAL_PARITY_MARK: parity = MARKPARITY; break;
+    case SERIAL_PARITY_SPACE: parity = SPACEPARITY; break;
+    default: return -9;
     }
     // configure byte size
     dcbSerialParams.ByteSize = bytesize;
@@ -212,20 +214,20 @@ char serialib::openDevice(const char *Device, const unsigned int Bauds,
     dcbSerialParams.Parity = parity;
 
     // Write the parameters
-    if(!SetCommState(hSerial, &dcbSerialParams)) return -5;
+    if (!SetCommState(hSerial, &dcbSerialParams)) return -5;
 
     // Set TimeOut
 
     // Set the Timeout parameters
-    timeouts.ReadIntervalTimeout=0;
+    timeouts.ReadIntervalTimeout = 0;
     // No TimeOut
-    timeouts.ReadTotalTimeoutConstant=MAXDWORD;
-    timeouts.ReadTotalTimeoutMultiplier=0;
-    timeouts.WriteTotalTimeoutConstant=MAXDWORD;
-    timeouts.WriteTotalTimeoutMultiplier=0;
+    timeouts.ReadTotalTimeoutConstant = MAXDWORD;
+    timeouts.ReadTotalTimeoutMultiplier = 0;
+    timeouts.WriteTotalTimeoutConstant = MAXDWORD;
+    timeouts.WriteTotalTimeoutMultiplier = 0;
 
     // Write the parameters
-    if(!SetCommTimeouts(hSerial, &timeouts)) return -6;
+    if (!SetCommTimeouts(hSerial, &timeouts)) return -6;
 
     // Opening successfull
     return 1;
@@ -238,7 +240,11 @@ char serialib::openDevice(const char *Device, const unsigned int Bauds,
     // Open device
     fd = open(Device, O_RDWR | O_NOCTTY | O_NDELAY);
     // If the device is not open, return -1
-    if (fd == -1) return -2;
+    if (fd == -1)
+    {
+        fprintf(stderr, "ERROR in openDevice: failed to open device\n");
+        return -2;
+    }
     // Open the device in nonblocking mode
     fcntl(fd, F_SETFL, FNDELAY);
 
@@ -252,44 +258,46 @@ char serialib::openDevice(const char *Device, const unsigned int Bauds,
     speed_t         Speed;
     switch (Bauds)
     {
-    case 110  :     Speed=B110; break;
-    case 300  :     Speed=B300; break;
-    case 600  :     Speed=B600; break;
-    case 1200 :     Speed=B1200; break;
-    case 2400 :     Speed=B2400; break;
-    case 4800 :     Speed=B4800; break;
-    case 9600 :     Speed=B9600; break;
-    case 19200 :    Speed=B19200; break;
-    case 38400 :    Speed=B38400; break;
-    case 57600 :    Speed=B57600; break;
-    case 115200 :   Speed=B115200; break;
+    case 110:     Speed = B110; break;
+    case 300:     Speed = B300; break;
+    case 600:     Speed = B600; break;
+    case 1200:     Speed = B1200; break;
+    case 2400:     Speed = B2400; break;
+    case 4800:     Speed = B4800; break;
+    case 9600:     Speed = B9600; break;
+    case 19200:    Speed = B19200; break;
+    case 38400:    Speed = B38400; break;
+    case 57600:    Speed = B57600; break;
+    case 115200:   Speed = B115200; break;
     case 230400:    Speed = B230400; break;
     case 921600:    Speed = B921600; break;
-    default : return -4;
+    default: 
+        fprintf(stderr, "ERROR in openDevice: unsupported baudrate\n");
+        return -4;
     }
     int databits_flag = 0;
-    switch(Databits) {
-        case SERIAL_DATABITS_5: databits_flag = CS5; break;
-        case SERIAL_DATABITS_6: databits_flag = CS6; break;
-        case SERIAL_DATABITS_7: databits_flag = CS7; break;
-        case SERIAL_DATABITS_8: databits_flag = CS8; break;
+    switch (Databits) {
+    case SERIAL_DATABITS_5: databits_flag = CS5; break;
+    case SERIAL_DATABITS_6: databits_flag = CS6; break;
+    case SERIAL_DATABITS_7: databits_flag = CS7; break;
+    case SERIAL_DATABITS_8: databits_flag = CS8; break;
         //16 bits and everything else not supported
-        default: return -7;
+    default: return -7;
     }
     int stopbits_flag = 0;
-    switch(Stopbits) {
-        case SERIAL_STOPBITS_1: stopbits_flag = 0; break;
-        case SERIAL_STOPBITS_2: stopbits_flag = CSTOPB; break;
+    switch (Stopbits) {
+    case SERIAL_STOPBITS_1: stopbits_flag = 0; break;
+    case SERIAL_STOPBITS_2: stopbits_flag = CSTOPB; break;
         //1.5 stopbits and everything else not supported
-        default: return -8;
+    default: return -8;
     }
     int parity_flag = 0;
-    switch(Parity) {
-        case SERIAL_PARITY_NONE: parity_flag = 0; break;
-        case SERIAL_PARITY_EVEN: parity_flag = PARENB; break;
-        case SERIAL_PARITY_ODD: parity_flag = (PARENB | PARODD); break;
+    switch (Parity) {
+    case SERIAL_PARITY_NONE: parity_flag = 0; break;
+    case SERIAL_PARITY_EVEN: parity_flag = PARENB; break;
+    case SERIAL_PARITY_ODD: parity_flag = (PARENB | PARODD); break;
         //mark and space parity not supported
-        default: return -9;
+    default: return -9;
     }
 
     // Set the baud rate
@@ -297,12 +305,12 @@ char serialib::openDevice(const char *Device, const unsigned int Bauds,
     cfsetospeed(&options, Speed);
     // Configure the device : data bits, stop bits, parity, no control flow
     // Ignore modem control lines (CLOCAL) and Enable receiver (CREAD)
-    options.c_cflag |= ( CLOCAL | CREAD | databits_flag | parity_flag | stopbits_flag);
-    options.c_iflag |= ( IGNPAR | IGNBRK );
+    options.c_cflag |= (CLOCAL | CREAD | databits_flag | parity_flag | stopbits_flag);
+    options.c_iflag |= (IGNPAR | IGNBRK);
     // Timer unused
-    options.c_cc[VTIME]=0;
+    options.c_cc[VTIME] = 0;
     // At least on character before satisfy reading
-    options.c_cc[VMIN]=0;
+    options.c_cc[VMIN] = 0;
     // Activate the settings
     tcsetattr(fd, TCSANOW, &options);
     // Success

@@ -1,52 +1,30 @@
-/****************************************************************************
+/*
+ * udp_port.cpp
  *
- *   Copyright (c) 2018 MAVlink Development Team. All rights reserved.
- *   Author: Hannes Diethelm, <hannes.diethelm@gmail.com>
- *           Trent Lukaczyk, <aerialhedgehog@gmail.com>
- *           Jaycee Lock,    <jaycee.lock@gmail.com>
- *           Lorenz Meier,   <lm@inf.ethz.ch>
+ * Author:	Yevhenii Kovryzhenko, Department of Aerospace Engineering, Auburn University.
+ * Contact: yzk0058@auburn.edu
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in
- *    the documentation and/or other materials provided with the
- *    distribution.
- * 3. Neither the name PX4 nor the names of its contributors may be
- *    used to endorse or promote products derived from this software
- *    without specific prior written permission.
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
- * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
- * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
- * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED ''AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL I
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- ****************************************************************************/
-
-/**
- * @file udp_port.cpp
+ * Last Edit:  10/07/2022 (MM/DD/YYYY)
  *
- * @brief UDP interface functions
- *
- * Functions for opening, closing, reading and writing via UDP ports
- *
- * @author Hannes Diethelm, <hannes.diethelm@gmail.com>
- * @author Trent Lukaczyk, <aerialhedgehog@gmail.com>
- * @author Jaycee Lock,    <jaycee.lock@gmail.com>
- * @author Lorenz Meier,   <lm@inf.ethz.ch>
- *
+ * Functions for opening, closing, reading and writing via UDP ports.
  */
 
 
@@ -55,6 +33,7 @@
 // ------------------------------------------------------------------------------
 
 #include "udp_port.h"
+#include <sys/ioctl.h>
 
 
 // ----------------------------------------------------------------------------------
@@ -64,45 +43,44 @@
 // ------------------------------------------------------------------------------
 //   Con/De structors
 // ------------------------------------------------------------------------------
-UDP_Port::
-UDP_Port(const char *target_ip_, int udp_port_)
+UDP_Port::UDP_Port(const char *target_ip_, int targetPort_, int localPort_)
 {
 	initialize_defaults();
 	target_ip = target_ip_;
-	rx_port  = udp_port_;
+	target_port = targetPort_;
+	local_port = localPort_;
 	is_open = false;
 }
 
-UDP_Port::
-UDP_Port()
+UDP_Port::UDP_Port()
 {
 	initialize_defaults();
 }
 
-UDP_Port::
-~UDP_Port()
+UDP_Port::~UDP_Port()
 {
 	// destroy mutex
 	pthread_mutex_destroy(&lock);
 }
 
-void
-UDP_Port::
-initialize_defaults()
+void UDP_Port::initialize_defaults()
 {
 	// Initialize attributes
 	target_ip = "127.0.0.1";
-	rx_port  = 14550;
-	tx_port  = -1;
+	//rx_port  = 14550;
+	//tx_port  = -1;
 	is_open = false;
-	debug = false;
+	//debug = false;
 	sock = -1;
+	
+	local_port = 14551; //QGC socket port
+	target_port = 14550; //mavlink port
 
 	// Start mutex
 	int result = pthread_mutex_init(&lock, NULL);
 	if ( result != 0 )
 	{
-		printf("\n mutex init failed\n");
+		printf("ERROR in initialize_defaults: mutex init failed\n");
 		throw 1;
 	}
 }
@@ -111,79 +89,83 @@ initialize_defaults()
 // ------------------------------------------------------------------------------
 //   Read from UDP
 // ------------------------------------------------------------------------------
-int
-UDP_Port::
-read_message(mavlink_message_t &message)
-{
-	uint8_t          cp;
-	mavlink_status_t status;
+char UDP_Port::read_message(mavlink_message_t& message)
+{	
 	uint8_t          msgReceived = false;
 
-	// --------------------------------------------------------------------------
-	//   READ FROM PORT
-	// --------------------------------------------------------------------------
-
-	// this function locks the port during read
-	int result = _read_port(cp);
-
-
-	// --------------------------------------------------------------------------
-	//   PARSE MESSAGE
-	// --------------------------------------------------------------------------
-	if (result > 0)
+	if (is_available())
 	{
-		// the parsing
-		msgReceived = mavlink_parse_char(MAVLINK_COMM_1, cp, &message, &status);
+		uint8_t          cp;
+		mavlink_status_t status;
 
-		// check for dropped packets
-		if ( (lastStatus.packet_rx_drop_count != status.packet_rx_drop_count) && debug )
+		// --------------------------------------------------------------------------
+		//   READ FROM PORT
+		// --------------------------------------------------------------------------
+
+		// this function locks the port during read
+		int result = _read_port(cp);
+
+
+		// --------------------------------------------------------------------------
+		//   PARSE MESSAGE
+		// --------------------------------------------------------------------------
+		if (result > 0)
 		{
-			printf("ERROR: DROPPED %d PACKETS\n", status.packet_rx_drop_count);
-			unsigned char v=cp;
-			fprintf(stderr,"%02x ", v);
-		}
-		lastStatus = status;
-	}
-
-	// Couldn't read from port
-	else
-	{
-		fprintf(stderr, "ERROR: Could not read, res = %d, errno = %d : %m\n", result, errno);
-	}
-
-	// --------------------------------------------------------------------------
-	//   DEBUGGING REPORTS
-	// --------------------------------------------------------------------------
-	if(msgReceived && debug)
-	{
-		// Report info
-		printf("Received message from UDP with ID #%d (sys:%d|comp:%d):\n", message.msgid, message.sysid, message.compid);
-
-		fprintf(stderr,"Received UDP data: ");
-		unsigned int i;
-		uint8_t buffer[MAVLINK_MAX_PACKET_LEN];
-
-		// check message is write length
-		unsigned int messageLength = mavlink_msg_to_send_buffer(buffer, &message);
-
-		// message length error
-		if (messageLength > MAVLINK_MAX_PACKET_LEN)
-		{
-			fprintf(stderr, "\nFATAL ERROR: MESSAGE LENGTH IS LARGER THAN BUFFER SIZE\n");
+			// the parsing
+			msgReceived = mavlink_parse_char(MAVLINK_COMM_0, cp, &message, &status);
+#ifdef DEBUG
+			// check for dropped packets
+			if ((lastStatus.packet_rx_drop_count != status.packet_rx_drop_count))
+			{
+				printf("ERROR: DROPPED %d PACKETS\n", status.packet_rx_drop_count);
+				unsigned char v = cp;
+				fprintf(stderr, "%02x ", v);
+			}
+#endif // DEBUG		
+			lastStatus = status;
 		}
 
-		// print out the buffer
+		// Couldn't read from port
 		else
 		{
-			for (i=0; i<messageLength; i++)
-			{
-				unsigned char v=buffer[i];
-				fprintf(stderr,"%02x ", v);
-			}
-			fprintf(stderr,"\n");
+			fprintf(stderr, "ERROR: Could not read, res = %d, errno = %d : %m\n", result, errno);
 		}
-	}
 
+		// --------------------------------------------------------------------------
+		//   DEBUGGING REPORTS
+		// --------------------------------------------------------------------------
+#ifdef DEBUG
+		if (msgReceived)
+		{
+			// Report info
+			printf("Received message from UDP with ID #%d (sys:%d|comp:%d):\n", message.msgid, message.sysid, message.compid);
+
+			fprintf(stderr, "Received UDP data: ");
+			unsigned int i;
+			uint8_t buffer[MAVLINK_MAX_PACKET_LEN];
+
+			// check message is write length
+			unsigned int messageLength = mavlink_msg_to_send_buffer(buffer, &message);
+
+			// message length error
+			if (messageLength > MAVLINK_MAX_PACKET_LEN)
+			{
+				fprintf(stderr, "\nFATAL ERROR: MESSAGE LENGTH IS LARGER THAN BUFFER SIZE\n");
+			}
+
+			// print out the buffer
+			else
+			{
+				for (i = 0; i < messageLength; i++)
+				{
+					unsigned char v = buffer[i];
+					fprintf(stderr, "%02x ", v);
+				}
+				fprintf(stderr, "\n");
+			}
+		}
+#endif // DEBUG	
+	}
 	// Done!
 	return msgReceived;
 }
@@ -191,7 +173,7 @@ read_message(mavlink_message_t &message)
 // ------------------------------------------------------------------------------
 //   Write to UDP
 // ------------------------------------------------------------------------------
-int UDP_Port::write_message(const mavlink_message_t &message)
+int UDP_Port::write_message(const mavlink_message_t& message)
 {
 	char buf[300];
 
@@ -199,8 +181,8 @@ int UDP_Port::write_message(const mavlink_message_t &message)
 	unsigned len = mavlink_msg_to_send_buffer((uint8_t*)buf, &message);
 
 	// Write buffer to UDP port, locks port while writing
-	int bytesWritten = _write_port(buf,len);
-	if(bytesWritten < 0){
+	int bytesWritten = _write_port(buf, len);
+	if (bytesWritten < 0) {
 		fprintf(stderr, "ERROR: Could not write, res = %d, errno = %d : %m\n", bytesWritten, errno);
 	}
 
@@ -211,12 +193,7 @@ int UDP_Port::write_message(const mavlink_message_t &message)
 // ------------------------------------------------------------------------------
 //   Open UDP Port
 // ------------------------------------------------------------------------------
-/**
- * throws EXIT_FAILURE if could not open the port
- */
-void
-UDP_Port::
-start()
+char UDP_Port::start()
 {
 	// --------------------------------------------------------------------------
 	//   OPEN PORT
@@ -226,43 +203,74 @@ start()
 	sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if (sock < 0)
 	{
-		perror("error socket failed");
-		throw EXIT_FAILURE;
+		fprintf(stderr, "ERROR: failed to create a socket\n");
+		return -1;
 	}
 
+	memset(&local_addr, 0, sizeof(sockaddr_in));
+	local_addr.sin_family = AF_INET;
+	local_addr.sin_addr.s_addr = INADDR_ANY;
+	local_addr.sin_port = htons(local_port);
+	
+	/* Bind the socket to port 14551 - necessary to receive packets from qgroundcontrol */
+	if (-1 == bind(sock, (struct sockaddr*)&local_addr, sizeof(struct sockaddr)))
+	{
+		fprintf(stderr, "ERROR in start: failed to bind to socket %i\n", local_port);
+		close(sock);
+		return -1;
+		//perror("error bind failed");
+		//exit(EXIT_FAILURE);
+	}
+	/* Attempt to make it non blocking */
+#if (defined __QNX__) | (defined __QNXNTO__)
+	if (fcntl(sock, F_SETFL, O_NONBLOCK | FASYNC) < 0)
+#else
+	if (fcntl(sock, F_SETFL, O_NONBLOCK | O_ASYNC) < 0)
+#endif
+	{
+		fprintf(stderr, "ERROR in start: failed to set the socket as nonblocking %s\n", strerror(errno));
+		close(sock);
+		return -1;
+		//exit(EXIT_FAILURE);
+	}
+	memset(&target_addr, 0, sizeof(sockaddr_in));
+	target_addr.sin_family = AF_INET;
+	target_addr.sin_addr.s_addr = inet_addr(target_ip);
+	target_addr.sin_port = htons(target_port);
+
+	
+
+	
+
 	/* Bind the socket to rx_port - necessary to receive packets */
+	/*
 	struct sockaddr_in addr;
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = inet_addr(target_ip);;
 	addr.sin_port = htons(rx_port);
 
-	if (bind(sock, (struct sockaddr *) &addr, sizeof(struct sockaddr)))
+	if (bind(sock, (struct sockaddr*)&addr, sizeof(struct sockaddr)))
 	{
 		perror("error bind failed");
 		close(sock);
 		sock = -1;
 		throw EXIT_FAILURE;
 	}
-	/*if (fcntl(sock, F_SETFL, O_NONBLOCK | O_ASYNC) < 0)
-	{
-		fprintf(stderr, "error setting nonblocking: %s\n", strerror(errno));
-		close(sock);
-		sock = -1;
-		throw EXIT_FAILURE;
-	}*/
+	*/
 
 	// --------------------------------------------------------------------------
 	//   CONNECTED!
 	// --------------------------------------------------------------------------
-	printf("Listening to %s:%i\n", target_ip, rx_port);
+	printf("Binded to %i\n", local_port);
+	printf("Listening to %s:%i\n", target_ip, target_port);
 	lastStatus.packet_rx_drop_count = 0;
 
 	is_open = true;
 
 	printf("\n");
 
-	return;
+	return 0;
 
 }
 
@@ -270,64 +278,48 @@ start()
 // ------------------------------------------------------------------------------
 //   Close UDP Port
 // ------------------------------------------------------------------------------
-void
-UDP_Port::
-stop()
+void UDP_Port::stop()
 {
+#ifdef DEBUG
 	printf("CLOSE PORT\n");
+#endif // DEBUG
 
 	int result = close(sock);
 	sock = -1;
 
 	if ( result )
 	{
-		fprintf(stderr,"WARNING: Error on port close (%i)\n", result );
+		fprintf(stderr,"ERROR in stop: failed to close socket (%i)\n", result );
 	}
 
 	is_open = false;
 
+#ifdef DEBUG
 	printf("\n");
-
+#endif // DEBUG
 }
 
 // ------------------------------------------------------------------------------
 //   Read Port with Lock
 // ------------------------------------------------------------------------------
-int
-UDP_Port::
-_read_port(uint8_t& cp)
+int UDP_Port::_read_port(uint8_t& cp)
 {
-
-	socklen_t len;
-
+	int result = -1;	
 	// Lock
 	pthread_mutex_lock(&lock);
-
-	int result = -1;
+		
 	if (buff_ptr < buff_len) {
 		cp = buff[buff_ptr];
 		buff_ptr++;
 		result = 1;
 	}
 	else {
-		struct sockaddr_in addr;
-		len = sizeof(struct sockaddr_in);
-		result = recvfrom(sock, &buff, BUFF_LEN, 0, (struct sockaddr*)&addr, &len);
-		if (tx_port < 0) {
-			if (strcmp(inet_ntoa(addr.sin_addr), target_ip) == 0) {
-				tx_port = ntohs(addr.sin_port);
-				printf("Got first packet, sending to %s:%i\n", target_ip, rx_port);
-			}
-			else {
-				printf("ERROR: Got packet from %s:%i but listening on %s\n", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port), target_ip);
-			}
-		}
+		result = recvfrom(sock, (void*)buff, BUFF_LEN, 0, (struct sockaddr*)&target_addr, &fromlen);
 		if (result > 0) {
 			buff_len = result;
 			buff_ptr = 0;
 			cp = buff[buff_ptr];
 			buff_ptr++;
-			//printf("recvfrom: %i %i\n", result, cp);
 		}
 	}
 
@@ -337,36 +329,28 @@ _read_port(uint8_t& cp)
 	return result;
 }
 
+bool UDP_Port::is_available(void)
+{
+	int count;
+	ioctl(sock, FIONREAD, &count);
+	if (count > 0) return true;
+	else return false;
+}
+
 
 // ------------------------------------------------------------------------------
 //   Write Port with Lock
 // ------------------------------------------------------------------------------
 int UDP_Port::_write_port(char* buf, unsigned len)
 {
-
 	// Lock
 	pthread_mutex_lock(&lock);
 
 	// Write packet via UDP link
-	int bytesWritten = 0;
-	if (tx_port > 0) {
-		struct sockaddr_in addr;
-		memset(&addr, 0, sizeof(addr));
-		addr.sin_family = AF_INET;
-		addr.sin_addr.s_addr = inet_addr(target_ip);
-		addr.sin_port = htons(tx_port);
-		bytesWritten = sendto(sock, buf, len, 0, (struct sockaddr*)&addr, sizeof(struct sockaddr_in));
-		//printf("sendto: %i\n", bytesWritten);
-	}
-	else
-	{
-		printf("ERROR: Sending before first packet received!\n");
-		bytesWritten = -1;
-	}
+	int bytesWritten = sendto(sock, buf, len, 0, (struct sockaddr*)&target_addr, sizeof(struct sockaddr_in));
 
 	// Unlock
 	pthread_mutex_unlock(&lock);
-
 
 	return bytesWritten;
 }
