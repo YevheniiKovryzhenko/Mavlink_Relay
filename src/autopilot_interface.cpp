@@ -908,8 +908,7 @@ void Autopilot_Interface::start(void)
 		printf("Telemetry enabled, waiting for connection with the vehicle...\n");
 		while (not current_RX_messages.sysid)
 		{
-			if (time_to_exit)
-				return;
+			if (time_to_exit) return;
 			usleep(500000); // check at 2Hz
 		}
 
