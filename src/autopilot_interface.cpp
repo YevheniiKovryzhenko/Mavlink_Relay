@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Last Edit:  10/07/2022 (MM/DD/YYYY)
+ * Last Edit:  10/12/2022 (MM/DD/YYYY)
  *
  * Functions for sending and recieving commands to an autopilot via MAVlink
  */
@@ -229,28 +229,31 @@ void set_yaw_rate(float yaw_rate, mavlink_set_position_target_local_ned_t &sp)
 // ------------------------------------------------------------------------------
 //   Con/De structors
 // ------------------------------------------------------------------------------
-Autopilot_Interface::Autopilot_Interface(Generic_Port *port_)
+Autopilot_Interface::Autopilot_Interface(Generic_Port* target_port_, settings_t& settings_)
 {
-	init(port_, "127.0.0.1", 1);
+	init(target_port_, settings_);
 }
-Autopilot_Interface::Autopilot_Interface(Generic_Port* port_, std::string ip_addr_mocap_, int mocap_ID_)
+Autopilot_Interface::Autopilot_Interface(Generic_Port* target_port_, Generic_Port* relay_port_, settings_t& settings_)
 {
-	init(port_, ip_addr_mocap_, mocap_ID_);
+	init(target_port_, relay_port_, settings_);
 }
 
-void Autopilot_Interface::init(Generic_Port* port_, std::string ip_addr_mocap_, int mocap_ID_)
+void Autopilot_Interface::init(Generic_Port* target_port_, Generic_Port* relay_port_, settings_t& settings_)
 {
 	// initialize attributes
 	write_count = 0;
+	relay_write_count = 0;
 
-	reading_status = 0;      // whether the read thread is running
-	writing_status = 0;      // whether the write thread is running
+	reading_status = 0;     // whether the read thread is running
+	writing_status = 0;     // whether the write thread is running
+	relay_status = 0;		// whether the relay thread is running
 	control_status = 0;      // whether the autopilot is in offboard control mode
 	time_to_exit = false;  // flag to signal thread exit
 
 	read_tid.init(READ_THREAD_PRI, READ_THREAD_TYPE);
 	write_tid.init(WRITE_THREAD_PRI, WRITE_THREAD_TYPE);
 	vision_position_estimate_write_tid.init(VPE_THREAD_PRI, VPE_THREAD_TYPE);
+	relay_tid.init(RELAY_THREAD_PRI, RELAY_THREAD_TYPE);
 	printf_tid.init(PRINTF_THREAD_PRI, PRINTF_THREAD_TYPE);
 	sys_tid.init(SYS_THREAD_PRI, SYS_THREAD_TYPE);
 
@@ -259,69 +262,24 @@ void Autopilot_Interface::init(Generic_Port* port_, std::string ip_addr_mocap_, 
 	companion_id = 0; // companion computer component id
 
 	current_RX_messages.sysid = system_id;
-	current_RX_messages.compid = autopilot_id;
+	current_RX_messages.compid = autopilot_id;	
 
-	port = port_; // port management object
-	mocap_ID = mocap_ID_;
-	ip_addr_mocap = ip_addr_mocap_;
+	settings = settings_;
+
+	target_port = target_port_;
+	relay_port = relay_port_;
+	return;
+}
+
+void Autopilot_Interface::init(Generic_Port* target_port_, settings_t& settings_)
+{
+	settings_.enable_relay = false;
+	init(target_port_, relay_port, settings_);
+	return;
 }
 
 Autopilot_Interface::~Autopilot_Interface(){}
 
-void Autopilot_Interface::enable_control(void)
-{
-	enable_control_fl = true;
-	return;
-}
-void Autopilot_Interface::enable_telemetry(void)
-{
-	enable_telemetry_fl = true;
-	return;
-}
-void Autopilot_Interface::enable_mocap(void)
-{
-	enable_mocap_fl = true;
-	return;
-}
-void Autopilot_Interface::toggle_mocap_YUP2NED(bool in)
-{
-	mocap.togle_YUP2NED(in);
-	return;
-}
-void Autopilot_Interface::toggle_mocap_ZUP2NED(bool in)
-{
-	mocap.togle_ZUP2NED(in);
-	return;
-}
-void Autopilot_Interface::enable_vpe(void)
-{
-	enable_vpe_fl = true;
-	return;
-}
-void Autopilot_Interface::enable_print_mocap(void)
-{
-	enable_printf_fl = true;
-	printf_mocap_fl = true;
-	return;
-}
-void Autopilot_Interface::enable_print_vpe(void)
-{
-	enable_printf_fl = true;
-	printf_vpe_fl = true;
-	return;
-}
-void Autopilot_Interface::enable_print_control(void)
-{
-	enable_printf_fl = true;
-	printf_control_fl = true;
-	return;
-}
-void Autopilot_Interface::enable_print_telemetry(void)
-{
-	enable_printf_fl = true;
-	printf_telemetry_fl = true;
-	return;
-}
 
 // ------------------------------------------------------------------------------
 //   Update Setpoint
@@ -342,13 +300,14 @@ void Autopilot_Interface::read_messages(void)
 	//   READ MESSAGE
 	// ----------------------------------------------------------------------
 	mavlink_message_t message;
-	success = port->read_message(message);
+	success = target_port->read_message(message);
 
 	// ----------------------------------------------------------------------
 	//   HANDLE MESSAGE
 	// ----------------------------------------------------------------------
 	if (success)
 	{
+		if (settings.enable_relay) relay_message(message); //relay the message
 
 		// Store message sysid and compid.
 		// Note this doesn't handle multiple message sources.
@@ -508,12 +467,46 @@ void Autopilot_Interface::read_messages(void)
 }
 
 // ------------------------------------------------------------------------------
+//   Read Messages
+// ------------------------------------------------------------------------------
+void Autopilot_Interface::relay_read(void)
+{
+	bool success;               // receive success flag
+	// ----------------------------------------------------------------------
+	//   READ MESSAGE
+	// ----------------------------------------------------------------------
+	mavlink_message_t message;
+	success = relay_port->read_message(message);
+
+	// ----------------------------------------------------------------------
+	//   HANDLE MESSAGE
+	// ----------------------------------------------------------------------
+	if (success) write_message(message);
+	return;
+}
+
+// ------------------------------------------------------------------------------
+//   Relay Write
+// ------------------------------------------------------------------------------
+int Autopilot_Interface::relay_message(mavlink_message_t& message)
+{
+	// do the write
+	int len = relay_port->write_message(message);
+
+	// book keep
+	relay_write_count++;
+
+	// Done!
+	return len;
+}
+
+// ------------------------------------------------------------------------------
 //   Write Message
 // ------------------------------------------------------------------------------
 int Autopilot_Interface::write_message(mavlink_message_t message)
 {
 	// do the write
-	int len = port->write_message(message);
+	int len = target_port->write_message(message);
 
 	// book keep
 	write_count++;
@@ -740,7 +733,7 @@ Autopilot_Interface::arm_disarm( bool flag )
 	mavlink_msg_command_long_encode(system_id, companion_id, &message, &com);
 
 	// Send the message
-	int len = port->write_message(message);
+	int len = target_port->write_message(message);
 
 	// Done!
 	return len;
@@ -765,7 +758,7 @@ Autopilot_Interface::toggle_offboard_control( bool flag )
 	mavlink_msg_command_long_encode(system_id, companion_id, &message, &com);
 
 	// Send the message
-	int len = port->write_message(message);
+	int len = target_port->write_message(message);
 
 	// Done!
 	return len;
@@ -782,18 +775,18 @@ void Autopilot_Interface::start(void)
 #endif // DEBUG
 
 
-	if (enable_telemetry_fl)
+	if (settings.enable_target)
 	{
 		// --------------------------------------------------------------------------
 		//   CHECK PORT
 		// --------------------------------------------------------------------------
 
 #ifdef DEBUG
-		printf("Checking if port is running...\n");
+		printf("Checking if target_port is running...\n");
 #endif // DEBUG
-		if (!port->is_running()) // PORT_OPEN
+		if (!target_port->is_running()) // PORT_OPEN
 		{
-			fprintf(stderr, "ERROR: port not open\n");
+			fprintf(stderr, "ERROR: target_port not open\n");
 			throw 1;
 		}
 #ifdef DEBUG
@@ -802,30 +795,57 @@ void Autopilot_Interface::start(void)
 
 		// Start SYS thread:
 #ifdef DEBUG
-		printf("Starting SYS thread...\n")
+		printf("Starting SYS thread...\n");
 #endif // DEBUG
-		result = sys_tid.start(&start_autopilot_interface_sys_thread,this);
+		result = sys_tid.start(&start_autopilot_interface_sys_thread, this);
 		if (result) throw result;
 #ifdef DEBUG
-		printf("SYS thread started!\n")
+		printf("SYS thread started!\n");
+#endif // DEBUG		
+	}
+
+	if (settings.enable_relay)
+	{
+		// --------------------------------------------------------------------------
+		//   CHECK PORT
+		// --------------------------------------------------------------------------
+		if (!settings.enable_target)
+		{
+			fprintf(stderr, "ERROR: relay is enabled while there is no target\n");
+			throw 1;
+		}
+
+#ifdef DEBUG
+		printf("Checking if relay_port is running...\n");
+#endif // DEBUG
+		if (!relay_port->is_running()) // PORT_OPEN
+		{
+			fprintf(stderr, "ERROR: relay_port not open\n");
+			throw 1;
+		}
+#ifdef DEBUG
+		printf("Good.\n");
 #endif // DEBUG
 	}
+
 
 #ifdef DEBUG
 	printf("Check if mocap is enabled\n");
 #endif // DEBUG
-	if (enable_mocap_fl)
+	if (settings.enable_mocap)
 	{
 #ifdef DEBUG
 		printf("mocap is enabled, starting...\n");
 #endif // DEBUG
+		if (settings.mocap_YUP2NED) mocap.togle_YUP2NED(true);
+		else if (settings.mocap_ZUP2NED) mocap.togle_ZUP2NED(true);
 		// --------------------------------------------------------------------------
 		//   MOCAP READ THREAD
 		// --------------------------------------------------------------------------
 #ifdef DEBUG
 		printf("START MOCAP READ THREAD \n");
 #endif // DEBUG
-		result = mocap.start(ip_addr_mocap);
+		result = mocap.start(settings.mocap_ip);
 		if (result) throw result;
 
 		// now we're reading messages from mocap
@@ -836,7 +856,7 @@ void Autopilot_Interface::start(void)
 #ifdef DEBUG
 	printf("Check if telemetry is enabled\n");
 #endif // DEBUG
-	if (enable_telemetry_fl)
+	if (settings.enable_telemetry)
 	{
 #ifdef DEBUG
 		printf("Telemetry is enabled, starting...\n");
@@ -859,7 +879,7 @@ void Autopilot_Interface::start(void)
 	// --------------------------------------------------------------------------
 	//   WRITE VISION POSITION ESTIMATE THREAD
 	// --------------------------------------------------------------------------
-	if (enable_vpe_fl)
+	if (settings.enable_vpe)
 	{
 #ifdef DEBUG
 		printf("START VISION POSITION ESTIMATE WRITE THREAD \n");
@@ -876,7 +896,7 @@ void Autopilot_Interface::start(void)
 #ifdef DEBUG
 	printf("Check if telemetry is enabled\n");
 #endif // DEBUG
-	if (enable_telemetry_fl)
+	if (settings.enable_telemetry)
 	{
 		// --------------------------------------------------------------------------
 		//   CHECK FOR MESSAGES
@@ -932,7 +952,7 @@ void Autopilot_Interface::start(void)
 
 			// Wait for initial position ned
 			printf("Waiting for telemetry...\n");
-			if (enable_control_fl)
+			if (settings.enable_control)
 			{
 				while (not (current_RX_messages.time_stamps.local_position_ned &&
 					current_RX_messages.time_stamps.attitude))
@@ -966,7 +986,7 @@ void Autopilot_Interface::start(void)
 #ifdef DEBUG
 	printf("Check if control is enabled\n");
 #endif // DEBUG
-	if (enable_control_fl)
+	if (settings.enable_control)
 	{
 		// --------------------------------------------------------------------------
 		//   WRITE THREAD
@@ -987,7 +1007,7 @@ void Autopilot_Interface::start(void)
 #ifdef DEBUG
 	printf("Check if printing is enabled\n");
 #endif // DEBUG
-	if (enable_printf_fl)
+	if (settings.enable_print)
 	{
 #ifdef DEBUG
 		printf("START PRINTF THREAD \n");
@@ -1031,6 +1051,7 @@ void Autopilot_Interface::stop(void)
 	read_tid.stop(READ_THREAD_TOUT);
 	write_tid.stop(WRITE_THREAD_TOUT);
 	sys_tid.stop(SYS_THREAD_TOUT);
+	relay_tid.stop(RELAY_THREAD_TOUT);
 
 #ifdef DEBUG
 	printf("Trying to close mocap THREADS\n");
@@ -1042,7 +1063,7 @@ void Autopilot_Interface::stop(void)
 	printf("All threads are closed\n");
 #endif // DEBUG
 
-	// still need to close the port separately
+	// still need to close the target_port separately
 	return;
 }
 
@@ -1142,13 +1163,32 @@ void Autopilot_Interface::start_vision_position_estimate_write_thread(void)
 
 }
 
+// ------------------------------------------------------------------------------
+//   Relay Thread
+// ------------------------------------------------------------------------------
+void Autopilot_Interface::start_relay_thread(void)
+{
+
+	if (relay_status != 0)
+	{
+		fprintf(stderr, "ERROR in start_relay_thread: thread already running\n");
+		return;
+	}
+	else
+	{
+		relay_thread();
+		return;
+	}
+
+}
+
 
 // ------------------------------------------------------------------------------
 //   Quit Handler
 // ------------------------------------------------------------------------------
 void Autopilot_Interface::handle_quit( int sig )
 {
-	if (enable_control_fl) disable_offboard_control();	
+	if (settings.enable_control) disable_offboard_control();	
 
 	try {
 		stop();
@@ -1179,7 +1219,7 @@ void __print_data_float(double in, int size)
 void Autopilot_Interface::print_header(void)
 {
 	printf("\n| ");
-	if (enable_mocap_fl && printf_mocap_fl)
+	if (settings.enable_mocap && settings.print_mocap)
 	{
 		PRINT_HEADER(mocap.Hz);
 		PRINT_HEADER(mocap.roll);
@@ -1189,7 +1229,7 @@ void Autopilot_Interface::print_header(void)
 		PRINT_HEADER(mocap.y);
 		PRINT_HEADER(mocap.z);
 	}
-	if (enable_vpe_fl && printf_vpe_fl)
+	if (settings.enable_vpe && settings.print_vpe)
 	{
 		PRINT_HEADER(vpe.Hz);
 		PRINT_HEADER(vpe.roll);
@@ -1199,7 +1239,7 @@ void Autopilot_Interface::print_header(void)
 		PRINT_HEADER(vpe.y);
 		PRINT_HEADER(vpe.z);
 	}
-	if (enable_control_fl && printf_control_fl)
+	if (settings.enable_control && settings.print_control)
 	{
 		PRINT_HEADER(sp.Hz);
 		PRINT_HEADER(sp.x);
@@ -1211,7 +1251,7 @@ void Autopilot_Interface::print_header(void)
 		PRINT_HEADER(sp.yaw);
 		PRINT_HEADER(sp.yaw_rate);
 	}
-	if (enable_telemetry_fl && printf_telemetry_fl)
+	if (settings.enable_telemetry && settings.print_telemetry)
 	{
 		PRINT_HEADER(att.Hz);
 		PRINT_HEADER(att.roll);
@@ -1237,11 +1277,11 @@ void Autopilot_Interface::print_data(void)
 	uint64_t sp_time_ms_old;
 	uint64_t vpe_time_us_old;
 	mocap_data_t mc;
-	if (enable_mocap_fl && printf_mocap_fl)
+	if (settings.enable_mocap && settings.print_mocap)
 	{
-		mocap.get_data(mc, mocap_ID);
+		mocap.get_data(mc, settings.mocap_ID);
 	}
-	if (enable_vpe_fl && printf_vpe_fl)
+	if (settings.enable_vpe && settings.print_vpe)
 	{
 		{
 			std::lock_guard<std::mutex> lock(current_vision_position_estimate.mutex);
@@ -1250,7 +1290,7 @@ void Autopilot_Interface::print_data(void)
 		}
 
 	}
-	if (enable_control_fl && printf_control_fl)
+	if (settings.enable_control && settings.print_control)
 	{
 		{
 			std::lock_guard<std::mutex> lock(current_setpoint.mutex);
@@ -1258,7 +1298,7 @@ void Autopilot_Interface::print_data(void)
 			sp_time_ms_old = current_setpoint.time_ms_old;
 		}
 	}
-	if (enable_telemetry_fl && printf_telemetry_fl)
+	if (settings.enable_telemetry && settings.print_telemetry)
 	{
 		mav = current_RX_messages;
 		mav_time_stamps_old = time_stamps_old;
@@ -1266,7 +1306,7 @@ void Autopilot_Interface::print_data(void)
 
 	//print data
 	printf("\r| ");
-	if (enable_mocap_fl && printf_mocap_fl)
+	if (settings.enable_mocap && settings.print_mocap)
 	{
 		PRINT_DATA(1.0E6 / (mc.time_us - mc.time_us_old));
 		PRINT_DATA(mc.roll);
@@ -1276,7 +1316,7 @@ void Autopilot_Interface::print_data(void)
 		PRINT_DATA(mc.y);
 		PRINT_DATA(mc.z);
 	}
-	if (enable_vpe_fl && printf_vpe_fl)
+	if (settings.enable_vpe && settings.print_vpe)
 	{
 		PRINT_DATA(1.0E6 / (vpe.usec - vpe_time_us_old));
 		PRINT_DATA(vpe.roll);
@@ -1286,7 +1326,7 @@ void Autopilot_Interface::print_data(void)
 		PRINT_DATA(vpe.y);
 		PRINT_DATA(vpe.z);
 	}
-	if (enable_control_fl && printf_control_fl)
+	if (settings.enable_control && settings.print_control)
 	{
 		PRINT_DATA((1.0E3 / (sp.time_boot_ms - sp_time_ms_old)));
 		PRINT_DATA(sp.x);
@@ -1298,7 +1338,7 @@ void Autopilot_Interface::print_data(void)
 		PRINT_DATA(sp.yaw);
 		PRINT_DATA(sp.yaw_rate);
 	}
-	if (enable_telemetry_fl && printf_telemetry_fl)
+	if (settings.enable_telemetry && settings.print_telemetry)
 	{
 		PRINT_DATA((1.0E6 / (mav.time_stamps.attitude - mav_time_stamps_old.attitude)));
 		PRINT_DATA(mav.attitude.roll);
@@ -1322,12 +1362,10 @@ void Autopilot_Interface::print_data(void)
 void Autopilot_Interface::read_thread(void)
 {
 	reading_status = true;
-	uint64_t tmp_time_us = get_time_usec();
 	while ( ! time_to_exit )
 	{
 		read_messages();
 		usleep(1E6 / READ_THREAD_HZ); // Read batches at 10Hz
-		tmp_time_us = get_time_usec();
 	}
 
 	reading_status = false;
@@ -1348,7 +1386,7 @@ void Autopilot_Interface::vision_position_estimate_write_thread(void)
 	for (int i = 0; i < 21; i++) vpe.covariance[i] = 0;
 
 	//get the data from mocap
-	while (!__update_from_mocap(vpe, mocap_ID, mocap, time_to_exit));
+	while (!__update_from_mocap(vpe, settings.mocap_ID, mocap, time_to_exit));
 	// set vision position estimate
 	{
 		std::lock_guard<std::mutex> lock(current_vision_position_estimate.mutex);
@@ -1371,7 +1409,7 @@ void Autopilot_Interface::vision_position_estimate_write_thread(void)
 		{
 			std::lock_guard<std::mutex> lock(current_vision_position_estimate.mutex);
 			tmp_time_old = current_vision_position_estimate.data.usec;
-			tmp = __update_from_mocap(current_vision_position_estimate.data, mocap_ID, mocap, time_to_exit);
+			tmp = __update_from_mocap(current_vision_position_estimate.data, settings.mocap_ID, mocap, time_to_exit);
 			if (tmp) current_vision_position_estimate.time_us_old = tmp_time_old;
 		}
 		if (tmp)
@@ -1420,12 +1458,10 @@ void Autopilot_Interface::write_thread(void)
 
 	// Pixhawk needs to see off-board commands at minimum 2Hz,
 	// otherwise it will go into fail safe
-	uint64_t time_tmp = get_time_usec();
 	while ( !time_to_exit )
 	{		
 		write_setpoint();
 		usleep(1E6 / WRITE_THREAD_HZ);   // Stream at 4Hz
-		time_tmp = get_time_usec();
 	}
 
 	// signal end
@@ -1475,12 +1511,10 @@ void Autopilot_Interface::printf_thread(void)
 	print_header(); //stat by printing a header
 	
 	printf_status = true;
-	uint64_t tmp_time_us = get_time_usec();
 	while (!time_to_exit)
 	{		
 		print_data();
 		usleep(1E6 / PRINTF_THREAD_HZ);   // Print at 20Hz
-		tmp_time_us = get_time_usec();
 	}
 	printf("\n");
 
@@ -1489,6 +1523,23 @@ void Autopilot_Interface::printf_thread(void)
 	printf_status = false;
 	return;
 
+}
+
+// ------------------------------------------------------------------------------
+//   Relay Thread
+// ------------------------------------------------------------------------------
+void Autopilot_Interface::relay_thread(void)
+{
+	relay_status = true;
+	while (!time_to_exit)
+	{
+		relay_read(); //also writes the messages to target
+		usleep(1E6 / RELAY_THREAD_HZ);
+	}
+
+	relay_status = false;
+
+	return;
 }
 
 // End Autopilot_Interface
@@ -1559,4 +1610,14 @@ void* start_autopilot_interface_printf_thread(void* args)
 	return NULL;
 }
 
+void* start_autopilot_interface_relay_thread(void* args)
+{
+	// takes an autopilot object argument
+	Autopilot_Interface* autopilot_interface = (Autopilot_Interface*)args;
 
+	// run the object's read thread
+	autopilot_interface->start_relay_thread();
+
+	// done!
+	return NULL;
+}

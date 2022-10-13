@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Last Edit:  10/07/2022 (MM/DD/YYYY)
+ * Last Edit:  10/12/2022 (MM/DD/YYYY)
  *
  * This process connects an external MAVLink UART device to send and receive data.
  */
@@ -52,34 +52,7 @@ using namespace std;
 #include "autopilot_interface.hpp"
 #include "serial_port.hpp"
 #include "udp_port.h"
-
-typedef struct settings_t
-{
-	bool use_uart;
-	char* uart_name;
-	int baudrate;
-
-	bool use_udp;
-	char* target_ip;
-	int target_port;
-	int local_port;
-	
-	bool enable_mocap;
-	bool mocap_YUP2NED;
-	bool mocap_ZUP2NED;
-	char* mocap_ip;
-	int mocap_ID;
-	
-	bool enable_control;
-	bool autotakeoff;
-
-	bool enable_telemetry;
-
-	bool print_mocap;
-	bool print_control;
-	bool print_telemetry;
-	bool print_vpe;
-}settings_t;
+#include "settings.hpp"
 
 // ------------------------------------------------------------------------------
 //   Prototypes
@@ -89,10 +62,10 @@ int main(int argc, char **argv);
 int top(int argc, char **argv);
 
 void commands(Autopilot_Interface &autopilot_interface, bool autotakeoff);
-void parse_commandline(int argc, char** argv, settings_t& settings);
+char parse_commandline(int argc, char** argv, settings_t& settings);
 
 // quit handler
 Autopilot_Interface *autopilot_interface_quit;
-Generic_Port *port_quit;
+Generic_Port *target_port_quit, *relay_port_quit;
 void quit_handler( int sig );
 

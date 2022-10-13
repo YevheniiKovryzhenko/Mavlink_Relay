@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Last Edit:  10/07/2022 (MM/DD/YYYY)
+ * Last Edit:  10/12/2022 (MM/DD/YYYY)
  *
  * Functions for opening, closing, reading and writing via UDP ports.
  */
@@ -43,12 +43,12 @@
 // ------------------------------------------------------------------------------
 //   Con/De structors
 // ------------------------------------------------------------------------------
-UDP_Port::UDP_Port(const char *target_ip_, int targetPort_, int localPort_)
+UDP_Port::UDP_Port(const char *target_ip_, int targetPort_, int bind_port_)
 {
 	initialize_defaults();
 	target_ip = target_ip_;
 	target_port = targetPort_;
-	local_port = localPort_;
+	bind_port = bind_port_;
 	is_open = false;
 }
 
@@ -67,13 +67,10 @@ void UDP_Port::initialize_defaults()
 {
 	// Initialize attributes
 	target_ip = "127.0.0.1";
-	//rx_port  = 14550;
-	//tx_port  = -1;
 	is_open = false;
-	//debug = false;
 	sock = -1;
 	
-	local_port = 14551; //QGC socket port
+	bind_port = 14551; //QGC socket port
 	target_port = 14550; //mavlink port
 
 	// Start mutex
@@ -89,11 +86,18 @@ void UDP_Port::initialize_defaults()
 // ------------------------------------------------------------------------------
 //   Read from UDP
 // ------------------------------------------------------------------------------
+int UDP_Port::bytes_available(void)
+{
+	int count;
+	ioctl(sock, FIONREAD, &count);
+	return count;
+}
+
 char UDP_Port::read_message(mavlink_message_t& message)
 {	
 	uint8_t          msgReceived = false;
 
-	if (is_available())
+	while (!msgReceived && bytes_available() > 0)
 	{
 		uint8_t          cp;
 		mavlink_status_t status;
@@ -129,6 +133,7 @@ char UDP_Port::read_message(mavlink_message_t& message)
 		else
 		{
 			fprintf(stderr, "ERROR: Could not read, res = %d, errno = %d : %m\n", result, errno);
+			break;
 		}
 
 		// --------------------------------------------------------------------------
@@ -207,19 +212,17 @@ char UDP_Port::start()
 		return -1;
 	}
 
-	memset(&local_addr, 0, sizeof(sockaddr_in));
-	local_addr.sin_family = AF_INET;
-	local_addr.sin_addr.s_addr = INADDR_ANY;
-	local_addr.sin_port = htons(local_port);
+	memset(&bind_addr, 0, sizeof(sockaddr_in));
+	bind_addr.sin_family = AF_INET;
+	bind_addr.sin_addr.s_addr = INADDR_ANY;
+	bind_addr.sin_port = htons(bind_port);
 	
 	/* Bind the socket to port 14551 - necessary to receive packets from qgroundcontrol */
-	if (-1 == bind(sock, (struct sockaddr*)&local_addr, sizeof(struct sockaddr)))
+	if (-1 == bind(sock, (struct sockaddr*)&bind_addr, sizeof(struct sockaddr)))
 	{
-		fprintf(stderr, "ERROR in start: failed to bind to socket %i\n", local_port);
+		fprintf(stderr, "ERROR in start: failed to bind to socket %i\n", bind_port);
 		close(sock);
 		return -1;
-		//perror("error bind failed");
-		//exit(EXIT_FAILURE);
 	}
 	/* Attempt to make it non blocking */
 #if (defined __QNX__) | (defined __QNXNTO__)
@@ -231,38 +234,16 @@ char UDP_Port::start()
 		fprintf(stderr, "ERROR in start: failed to set the socket as nonblocking %s\n", strerror(errno));
 		close(sock);
 		return -1;
-		//exit(EXIT_FAILURE);
 	}
 	memset(&target_addr, 0, sizeof(sockaddr_in));
 	target_addr.sin_family = AF_INET;
 	target_addr.sin_addr.s_addr = inet_addr(target_ip);
 	target_addr.sin_port = htons(target_port);
 
-	
-
-	
-
-	/* Bind the socket to rx_port - necessary to receive packets */
-	/*
-	struct sockaddr_in addr;
-	memset(&addr, 0, sizeof(addr));
-	addr.sin_family = AF_INET;
-	addr.sin_addr.s_addr = inet_addr(target_ip);;
-	addr.sin_port = htons(rx_port);
-
-	if (bind(sock, (struct sockaddr*)&addr, sizeof(struct sockaddr)))
-	{
-		perror("error bind failed");
-		close(sock);
-		sock = -1;
-		throw EXIT_FAILURE;
-	}
-	*/
-
 	// --------------------------------------------------------------------------
 	//   CONNECTED!
 	// --------------------------------------------------------------------------
-	printf("Binded to %i\n", local_port);
+	printf("Binded to %i\n", bind_port);
 	printf("Listening to %s:%i\n", target_ip, target_port);
 	lastStatus.packet_rx_drop_count = 0;
 
@@ -327,14 +308,6 @@ int UDP_Port::_read_port(uint8_t& cp)
 	pthread_mutex_unlock(&lock);
 
 	return result;
-}
-
-bool UDP_Port::is_available(void)
-{
-	int count;
-	ioctl(sock, FIONREAD, &count);
-	if (count > 0) return true;
-	else return false;
 }
 
 

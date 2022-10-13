@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Last Edit:  10/07/2022 (MM/DD/YYYY)
+ * Last Edit:  10/12/2022 (MM/DD/YYYY)
  *
  * Functions for opening, closing, reading and writing via serial ports.
  */
@@ -78,6 +78,7 @@ public:
 	}
 	char start();
 	void stop();
+	int bytes_available(void);
 
 private:
 	serialib serial;

@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Last Edit:  10/07/2022 (MM/DD/YYYY)
+ * Last Edit:  10/12/2022 (MM/DD/YYYY)
  *
  * Functions for opening, closing, reading and writing via serial ports.
  */
@@ -49,22 +49,18 @@ Serial_Port::Serial_Port(const char *uart_name_ , int baudrate_)
 	baudrate  = baudrate_;
 }
 
-Serial_Port::
-Serial_Port()
+Serial_Port::Serial_Port()
 {
 	initialize_defaults();
 }
 
-Serial_Port::
-~Serial_Port()
+Serial_Port::~Serial_Port()
 {
 	// destroy mutex
 	pthread_mutex_destroy(&lock);
 }
 
-void
-Serial_Port::
-initialize_defaults()
+void Serial_Port::initialize_defaults()
 {
 	// Initialize attributes
 	debug  = false;
@@ -87,6 +83,10 @@ initialize_defaults()
 // ------------------------------------------------------------------------------
 //   Read from Serial
 // ------------------------------------------------------------------------------
+int Serial_Port::bytes_available(void)
+{
+	return serial.available();
+}
 char Serial_Port::read_message(mavlink_message_t &message)
 {	
 	uint8_t          msgReceived = false;
@@ -96,7 +96,7 @@ char Serial_Port::read_message(mavlink_message_t &message)
 	// --------------------------------------------------------------------------
 
 	// this function locks the port during read
-	if (serial.available())
+	while (!msgReceived && serial.available() > 0)
 	{
 		uint8_t          cp;
 		mavlink_status_t status;

@@ -1,52 +1,30 @@
-/****************************************************************************
+/*
+ * udp_port.hpp
  *
- *   Copyright (c) 2018 MAVlink Development Team. All rights reserved.
- *   Author: Hannes Diethelm, <hannes.diethelm@gmail.com>
- *           Trent Lukaczyk, <aerialhedgehog@gmail.com>
- *           Jaycee Lock,    <jaycee.lock@gmail.com>
- *           Lorenz Meier,   <lm@inf.ethz.ch>
+ * Author:	Yevhenii Kovryzhenko, Department of Aerospace Engineering, Auburn University.
+ * Contact: yzk0058@auburn.edu
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in
- *    the documentation and/or other materials provided with the
- *    distribution.
- * 3. Neither the name PX4 nor the names of its contributors may be
- *    used to endorse or promote products derived from this software
- *    without specific prior written permission.
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
- * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
- * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
- * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED ''AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL I
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- ****************************************************************************/
-
-/**
- * @file udp_port.h
+ * Last Edit:  10/12/2022 (MM/DD/YYYY)
  *
- * @brief UDP interface definition
- *
- * Functions for opening, closing, reading and writing via UDP ports
- *
- * @author Hannes Diethelm, <hannes.diethelm@gmail.com>
- * @author Trent Lukaczyk, <aerialhedgehog@gmail.com>
- * @author Jaycee Lock,    <jaycee.lock@gmail.com>
- * @author Lorenz Meier,   <lm@inf.ethz.ch>
- *
+ * Functions for opening, closing, reading and writing via UDP ports.
  */
 
 #ifndef UDP_PORT_H_
@@ -103,7 +81,7 @@ class UDP_Port: public Generic_Port
 public:
 
 	UDP_Port();
-	UDP_Port(const char *target_ip_, int targetPort_, int localPort_);
+	UDP_Port(const char *target_ip_, int targetPort_, int bind_port_);
 	virtual ~UDP_Port();
 
 	char read_message(mavlink_message_t &message);
@@ -114,7 +92,7 @@ public:
 	}
 	char start();
 	void stop();
-	bool is_available(void);
+	int bytes_available(void);
 
 private:
 
@@ -133,12 +111,11 @@ private:
 	bool is_open;
 
 	struct sockaddr_in target_addr;
-	struct sockaddr_in local_addr;
-	uint16_t local_port;
+	struct sockaddr_in bind_addr;
+	uint16_t bind_port;
 	uint16_t target_port;
 	socklen_t fromlen = sizeof(target_addr);
 	int bytes_sent;
-	//uint16_t len;
 	
 
 	int  _read_port(uint8_t &cp);

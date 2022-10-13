@@ -84,6 +84,7 @@ public:
 	virtual bool is_running()=0;
 	virtual char start()=0;
 	virtual void stop()=0;
+	virtual int bytes_available(void) = 0;
 };
 
 

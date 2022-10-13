@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Last Edit:  10/07/2022 (MM/DD/YYYY)
+ * Last Edit:  10/12/2022 (MM/DD/YYYY)
  *
  * This process connects an external MAVLink UART device to send and receive data.
  */
@@ -51,19 +51,37 @@ int top (int argc, char **argv)
 
 	// Default input arguments
 	settings_t settings;
-
+	settings.enable_target = false;
 #ifdef __APPLE__
-	settings.uart_name = (char*)"/dev/tty.usbmodem1";
+	settings.target_uart_name = (char*)"/dev/tty.usbmodem1";
+	settings.relay_uart_name = (char*)"/dev/tty.usbmodem1";
 #else
-	settings.uart_name = (char*)"/dev/ttyUSB0";
+	settings.target_uart_name = (char*)"/dev/ttyUSB0";
+	settings.relay_uart_name = (char*)"/dev/ttyUSB0";
 #endif
-	settings.use_uart = false;
-	settings.baudrate = 57600;
+	settings.target_use_uart = false;
+	settings.target_baudrate = 57600;
 
-	settings.use_udp = false;
+	settings.target_use_udp = false;
 	settings.target_ip = (char*)"127.0.0.1";
-	settings.target_port = 14555;
-	settings.local_port = 14550;
+	settings.target_port = 14550;
+	settings.target_bind_port = 14555;
+
+	settings.enable_relay = false;
+#ifdef __APPLE__
+	settings.relay_uart_name = (char*)"/dev/tty.usbmodem1";
+#else
+	settings.relay_uart_name = (char*)"/dev/ttyUSB0";
+#endif
+
+	settings.relay_use_uart = false;
+	settings.relay_baudrate = 57600;
+
+	settings.relay_use_udp = false;
+	settings.relay_ip = (char*)"127.0.0.1";
+	settings.relay_port = 14550;
+	settings.relay_bind_port = 14551;
+
 
 	settings.autotakeoff = false;
 
@@ -81,7 +99,24 @@ int top (int argc, char **argv)
 	settings.print_telemetry = false;
 
 	// do the parse, will throw an int if it fails
-	parse_commandline(argc, argv, settings);
+	if (parse_commandline(argc, argv, settings) < 0)
+	{
+		fprintf(stderr, "ERROR in top: failed to parse compandline arguments\n");
+		return -1;
+	}
+
+	// check input flags:
+	if (settings.enable_target)
+	{
+		settings.enable_vpe = settings.enable_mocap;
+	}
+	else
+	{
+		settings.enable_relay = false;
+		settings.enable_control = false;
+		settings.enable_vpe = false;
+		settings.enable_telemetry = false;
+	}
 
 	// --------------------------------------------------------------------------
 	//   PORT and THREAD STARTUP
@@ -97,15 +132,30 @@ int top (int argc, char **argv)
 	 * pthread mutex lock. It can be a serial or an UDP port.
 	 *
 	 */
-	Generic_Port *port;
+	Generic_Port *target_port, *relay_port;
 
-	if (settings.use_udp)
+	if (settings.enable_target)
 	{
-		port = new UDP_Port(settings.target_ip, settings.target_port, settings.local_port);
+		if (settings.target_use_udp)
+		{
+			target_port = new UDP_Port(settings.target_ip, settings.target_port, settings.target_bind_port);
+		}
+		else
+		{
+			target_port = new Serial_Port(settings.target_uart_name, settings.target_baudrate);
+		}
 	}
-	else
+
+	if (settings.enable_relay)
 	{
-		port = new Serial_Port(settings.uart_name, settings.baudrate);
+		if (settings.relay_use_udp)
+		{
+			relay_port = new UDP_Port(settings.relay_ip, settings.relay_port, settings.relay_bind_port);
+		}
+		else
+		{
+			relay_port = new Serial_Port(settings.relay_uart_name, settings.relay_baudrate);
+		}
 	}
 
 	/*
@@ -123,9 +173,8 @@ int top (int argc, char **argv)
 	* otherwise the vehicle will go into failsafe.
 	*
 	*/
-	Autopilot_Interface autopilot_interface(port, settings.mocap_ip, settings.mocap_ID);
+	Autopilot_Interface autopilot_interface(target_port, relay_port, settings);
 
-	if (settings.enable_control) autopilot_interface.enable_control();
 
 	/*
 	* Setup interrupt signal handler
@@ -135,7 +184,8 @@ int top (int argc, char **argv)
 	* The handler in this example needs references to the above objects.
 	*
 	*/
-	port_quit = port;
+	if (settings.enable_target) target_port_quit = target_port;
+	if (settings.enable_relay) relay_port_quit = relay_port;
 	autopilot_interface_quit = &autopilot_interface;
 	signal(SIGINT, quit_handler);
 
@@ -143,57 +193,34 @@ int top (int argc, char **argv)
 	printf("quit handler started\n");
 #endif // DEBUG
 
-
-	if (settings.enable_mocap) //for now don't do control
+	if (settings.enable_target)
 	{
-#ifdef DEBUG
-		printf("Enabling mocap...\n");
-#endif // DEBUG
-		autopilot_interface.enable_mocap();
-		if (settings.mocap_YUP2NED)autopilot_interface.toggle_mocap_YUP2NED(true);
-		else if (settings.mocap_ZUP2NED)autopilot_interface.toggle_mocap_ZUP2NED(true);
-		if (settings.print_mocap) autopilot_interface.enable_print_mocap();
-		if (settings.enable_telemetry)
-		{
-			autopilot_interface.enable_vpe();
-			if (settings.print_vpe) autopilot_interface.enable_print_vpe();
-		}
-	}
-
-	if (settings.enable_control)
-	{
-#ifdef DEBUG
-		printf("Enabling control...\n");
-#endif // DEBUG
-		autopilot_interface.enable_control();
-		if (settings.print_control) autopilot_interface.enable_print_control();
-	}
-
-	if (settings.enable_telemetry)
-	{
-#ifdef DEBUG
-		printf("Enabling telemetry...\n");
-#endif // DEBUG
-		autopilot_interface.enable_telemetry();
-		if (settings.print_telemetry) autopilot_interface.enable_print_telemetry();
-
-
 		/*
-		* Start the port and autopilot_interface
-		* This is where the port is opened, and read and write threads are started.
+		* Start the target port
 		*/
 #ifdef DEBUG
-		printf("Starting port...\n");
+		printf("Starting target port...\n");
 #endif // DEBUG
-		port->start();
-#ifdef DEBUG
-		printf("Starting autopilot interface...\n");
-#endif // DEBUG
+		target_port->start();
 	}
 
+	if (settings.enable_relay)
+	{
+		/*
+		* Start the relay port
+		*/
+#ifdef DEBUG
+		printf("Starting relay port...\n");
+#endif // DEBUG
+		relay_port->start();
+	}
+
+#ifdef DEBUG
+	printf("Starting autopilot interface...\n");
+#endif // DEBUG
 	autopilot_interface.start();
 
-	if (settings.enable_control)
+	if (settings.enable_target && settings.enable_control)
 	{
 #ifdef DEBUG
 		printf("Running commands port...\n");
@@ -224,10 +251,16 @@ int top (int argc, char **argv)
 	printf("Terminating...\n");
 #endif // DEBUG
 	autopilot_interface.stop();
-	port->stop();
-
-	delete port;
-
+	if (settings.enable_target)
+	{
+		target_port->stop();
+		delete target_port;
+	}
+	if (settings.enable_relay)
+	{
+		relay_port->stop();
+		delete relay_port;
+	}
 	// --------------------------------------------------------------------------
 	//   DONE
 	// --------------------------------------------------------------------------
@@ -412,91 +445,213 @@ void commands(Autopilot_Interface &api, bool autotakeoff)
 // ------------------------------------------------------------------------------
 //   Parse Command Line
 // ------------------------------------------------------------------------------
-// throws EXIT_FAILURE if could not open the port
-void parse_commandline(int argc, char **argv, settings_t& settings)
+// return -1 if could not parse something
+char parse_commandline(int argc, char **argv, settings_t& settings)
 {
 
 	// string for command line usage
 	const char* commandline_usage = \
-		"\n-----------------------------------------------------------------------------------------------------------------\n"
-		"			Usage of mavlink_control"
-		"\n-----------------------------------------------------------------------------------------------------------------\n"
-		"shortcut	\tfull flag			meaning					default value\n"
-		"-h			--help				prints this message\n"
-		"-d			--device			specify device name\t		/dev/ttyUSB0\n"
-		"-b			--baudrate			specify baudrate			57600\n"
-		"-u			--udp_ip			specify upd address\t		127.0.0.1\n"
-		"-p			--port				specify udp port			14540\n"
-		"-c			--enable_control\t	enable control algorithm		false\n"
-		"-t			--disable_telem\t\t	disable telemetry send/receive\t\tfalse\n"
-		"-m			--mocap_ip			specify mocap interface\t		127.0.0.1\n"
-		"-mI\t		--mocap_ID			specify frame ID from mocap\t	1\n"
-		"-mY\t		--mocap_YUP2NED\t		rotate from Y-Up to NED			false\n"
-		"-mZ\t		--mocap_ZUP2NED\t		rotate from Z-Up to NED			false\n"
-		"-pc\t		--print_control\t\t	print setpoints to console		false\n"
-		"-pm\t		--print_mocap\t		print mocap tracking			false\n"
-		"-pv\t		--print_vpe\t		print vision position estimate\t	false\n"
-		"-pt\t		--print_telemetry\t	print data from the vehicle		false"
-		"\n-----------------------------------------------------------------------------------------------------------------\n";
+		"\n-----------------------------------------------------------------------------------------------------------------------------------------------------\n"
+		"						Usage of mavlink_control"
+		"\n-----------------------------------------------------------------------------------------------------------------------------------------------------\n"
+		"shortcut		full flag   					meaning								default value\n\n"
+		"-h 			--help 	    					prints this message\n\n"
+		"-et			--enable_target					enable communication with target (uses default udp)		false\n"
+		"-td			--target_device					specify target device name					/dev/ttyUSB0\n"
+		"-tb			--target_baudrate				specify target baudrate						57600\n"
+		"-tu			--target_udp_ip					specify target upd address					127.0.0.1\n"
+		"-tp			--target_port					specify target udp port						14550\n"
+		"-tbp			--target_bind_port				specify target bind udp port    				14555\n\n"
+		"-er			--enable_relay					enable relay communication with target (uses default udp)	false\n"
+		"-rd			--relay_device					specify relay device name					/dev/ttyUSB0\n"
+		"-rb			--relay_baudrate				specify relay baudrate						57600\n"
+		"-ru			--relay_udp_ip					specify relay upd address					127.0.0.1\n"
+		"-rp			--relay_port					specify relay udp port						14550\n"
+		"-rbp			--relay_bind_port				specify relay bind udp port					14555\n\n"
+		"-em			--enable_mocap					enable mocap (uses default ip)  				false\n"
+		"-m 			--mocap_ip					specify mocap interface						127.0.0.1\n"
+		"-mI			--mocap_ID  					specify frame ID from mocap					1\n"
+		"-mY			--mocap_YUP2NED					rotate from Y-Up to NED 					false\n"
+		"-mZ			--mocap_ZUP2NED					rotate from Z-Up to NED 					false\n"
+		"-c 			--enable_control				enable control algorithm					false\n\n"
+		"-t 			--disable_telem					disable telemetry send/receive					false\n"		
+		"-pc			--print_control					print setpoints to console					false\n"
+		"-pm			--print_mocap					print mocap tracking						false\n"
+		"-pv			--print_vpe 					print vision position estimate					false\n"
+		"-pt			--print_telemetry				print data from the vehicle					false"
+		"\n-----------------------------------------------------------------------------------------------------------------------------------------------------\n";
 		
 	// Read input arguments
-	for (int i = 1; i < argc; i++) { // argv[0] is "mavlink"
+	for (int i = 1; i < argc; i++) {
 
 		// Help
 		if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
 			printf("%s\n",commandline_usage);
-			throw EXIT_FAILURE;
+			return -1;
 		}
 
-		// UART device ID
-		if (strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "--device") == 0) {
+		// target enable target
+		if (strcmp(argv[i], "-et") == 0 || strcmp(argv[i], "--enable_target") == 0) {
+			settings.enable_target = true;
+			settings.target_use_udp = true;
+		}
+
+		// target UART device ID
+		if (strcmp(argv[i], "-td") == 0 || strcmp(argv[i], "--target_device") == 0) {
 			if (argc > i + 1) {
 				i++;
-				settings.use_uart = true;
-				settings.uart_name = argv[i];
+				settings.enable_target = true;
+				settings.target_use_uart = true;
+				settings.target_uart_name = argv[i];
+				settings.target_use_udp = false;
 			} else {
 				printf("%s\n",commandline_usage);
-				throw EXIT_FAILURE;
+				return -1;
 			}
 		}
 
-		// Baud rate
-		if (strcmp(argv[i], "-b") == 0 || strcmp(argv[i], "--baud") == 0) {
+		// target Baud rate
+		if (strcmp(argv[i], "-tb") == 0 || strcmp(argv[i], "--target_baud") == 0) {
 			if (argc > i + 1) {
 				i++;
-				settings.baudrate = atoi(argv[i]);
+				settings.enable_target = true;
+				settings.target_use_uart = true;
+				settings.target_baudrate = atoi(argv[i]);
+				settings.target_use_udp = false;
 			} else {
 				printf("%s\n",commandline_usage);
-				throw EXIT_FAILURE;
+				return -1;
 			}
 		}
 
-		// UDP ip
-		if (strcmp(argv[i], "-u") == 0 || strcmp(argv[i], "--udp_ip") == 0) {
+		// target UDP ip
+		if (strcmp(argv[i], "-tu") == 0 || strcmp(argv[i], "--target_udp_ip") == 0) {
 			if (argc > i + 1) {
 				i++;
+				settings.enable_target = true;
 				settings.target_ip = argv[i];
-				settings.use_udp = true;
+				settings.target_use_udp = true;
+				settings.target_use_uart = false;
 			} else {
 				printf("%s\n",commandline_usage);
-				throw EXIT_FAILURE;
+				return -1;
 			}
 		}
 
-		// UDP port
-		if (strcmp(argv[i], "-p") == 0 || strcmp(argv[i], "--port") == 0) {
+		// target UDP port
+		if (strcmp(argv[i], "-tp") == 0 || strcmp(argv[i], "--target_port") == 0) {
 			if (argc > i + 1) {
 				i++;
+				settings.enable_target = true;
 				settings.target_port = atoi(argv[i]);
-				settings.use_udp = true;
+				settings.target_use_udp = true;
+				settings.target_use_uart = false;
 			} else {
 				printf("%s\n",commandline_usage);
-				throw EXIT_FAILURE;
+				return -1;
 			}
 		}
 		
+		// target UDP bind port
+		if (strcmp(argv[i], "-tb") == 0 || strcmp(argv[i], "--target_bind_port") == 0) {
+			if (argc > i + 1) {
+				i++;
+				settings.enable_target = true;
+				settings.target_bind_port = atoi(argv[i]);
+				settings.target_use_udp = true;
+				settings.target_use_uart = false;
+			}
+			else {
+				printf("%s\n", commandline_usage);
+				return -1;
+			}
+		}
+
+		// relay enable target
+		if (strcmp(argv[i], "-er") == 0 || strcmp(argv[i], "--enable_relay") == 0) {
+			settings.enable_relay = true;
+			settings.relay_use_udp = true;
+		}
+
+		// relay UART device ID
+		if (strcmp(argv[i], "-rd") == 0 || strcmp(argv[i], "--relay_device") == 0) {
+			if (argc > i + 1) {
+				i++;
+				settings.enable_relay = true;
+				settings.relay_use_uart = true;
+				settings.relay_uart_name = argv[i];
+				settings.relay_use_udp = false;
+			}
+			else {
+				printf("%s\n", commandline_usage);
+				return -1;
+			}
+		}
+
+		// relay Baud rate
+		if (strcmp(argv[i], "-rb") == 0 || strcmp(argv[i], "--relay_baud") == 0) {
+			if (argc > i + 1) {
+				i++;
+				settings.enable_relay = true;
+				settings.relay_use_uart = true;
+				settings.relay_baudrate = atoi(argv[i]);
+				settings.relay_use_udp = false;
+			}
+			else {
+				printf("%s\n", commandline_usage);
+				return -1;
+			}
+		}
+
+		// relay UDP ip
+		if (strcmp(argv[i], "-ru") == 0 || strcmp(argv[i], "--relay_udp_ip") == 0) {
+			if (argc > i + 1) {
+				i++;
+				settings.enable_relay = true;
+				settings.relay_ip = argv[i];
+				settings.relay_use_udp = true;
+				settings.relay_use_uart = false;
+			}
+			else {
+				printf("%s\n", commandline_usage);
+				return -1;
+			}
+		}
+
+		// relay UDP port
+		if (strcmp(argv[i], "-rp") == 0 || strcmp(argv[i], "--relay_port") == 0) {
+			if (argc > i + 1) {
+				i++;
+				settings.enable_relay = true;
+				settings.relay_port = atoi(argv[i]);
+				settings.relay_use_udp = true;
+				settings.relay_use_uart = false;
+			}
+			else {
+				printf("%s\n", commandline_usage);
+				return -1;
+			}
+		}
+
+		// relay UDP bind port
+		if (strcmp(argv[i], "-rb") == 0 || strcmp(argv[i], "--relay_bind_port") == 0) {
+			if (argc > i + 1) {
+				i++;
+				settings.enable_relay = true;
+				settings.relay_bind_port = atoi(argv[i]);
+				settings.relay_use_udp = true;
+				settings.relay_use_uart = false;
+			}
+			else {
+				printf("%s\n", commandline_usage);
+				return -1;
+			}
+		}
 
 		// mocap
+		if (strcmp(argv[i], "-em") == 0 || strcmp(argv[i], "--enable_mocap") == 0) {
+			settings.enable_mocap = true;
+		}
 		if (strcmp(argv[i], "-m") == 0 || strcmp(argv[i], "--mocap_ip") == 0) {
 			if (argc > i + 1) {
 				i++;
@@ -505,7 +660,7 @@ void parse_commandline(int argc, char **argv, settings_t& settings)
 			}
 			else {
 				printf("%s\n", commandline_usage);
-				throw EXIT_FAILURE;
+				return -1;
 			}
 		}
 		if (strcmp(argv[i], "-mI") == 0 || strcmp(argv[i], "--mocap_ID") == 0) {
@@ -516,7 +671,7 @@ void parse_commandline(int argc, char **argv, settings_t& settings)
 			}
 			else {
 				printf("%s\n", commandline_usage);
-				throw EXIT_FAILURE;
+				return -1;
 			}
 		}
 		if (strcmp(argv[i], "-mY") == 0 || strcmp(argv[i], "--mocap_YUP2NED") == 0) {
@@ -525,7 +680,7 @@ void parse_commandline(int argc, char **argv, settings_t& settings)
 			{
 				fprintf(stderr, "ERROR can only specify one rotation at a time\n");
 				printf("%s\n", commandline_usage);
-				throw EXIT_FAILURE;
+				return -1;
 			}
 		}
 		if (strcmp(argv[i], "-mZ") == 0 || strcmp(argv[i], "--mocap_ZUP2NED") == 0) {
@@ -534,7 +689,7 @@ void parse_commandline(int argc, char **argv, settings_t& settings)
 			{
 				fprintf(stderr, "ERROR can only specify one rotation at a time\n");
 				printf("%s\n", commandline_usage);
-				throw EXIT_FAILURE;
+				return -1;
 			}
 		}
 
@@ -555,21 +710,25 @@ void parse_commandline(int argc, char **argv, settings_t& settings)
 		//printf settings
 		if (strcmp(argv[i], "-pm") == 0 || strcmp(argv[i], "--print_mocap") == 0) {
 			settings.print_mocap = true;
+			settings.enable_print = true;
 		}
 		if (strcmp(argv[i], "-pv") == 0 || strcmp(argv[i], "--print_vpe") == 0) {
 			settings.print_vpe = true;
+			settings.enable_print = true;
 		}
 		if (strcmp(argv[i], "-pc") == 0 || strcmp(argv[i], "--print_control") == 0) {
 			settings.print_control = true;
+			settings.enable_print = true;
 		}
 		if (strcmp(argv[i], "-pt") == 0 || strcmp(argv[i], "--print_telemetry") == 0) {
 			settings.print_telemetry = true;
+			settings.enable_print = true;
 		}
 	}
 	// end: for each input argument
 
 	// Done!
-	return;
+	return 0;
 }
 
 
@@ -591,12 +750,24 @@ void quit_handler( int sig )
 	catch (int error){}
 
 	// port
-	try {
-		port_quit->stop();
+	if (target_port_quit != nullptr)
+	{
+		try {
+			target_port_quit->stop();
+		}
+		catch (int error) {}
+		delete target_port_quit;
 	}
-	catch (int error){}
 
-	delete port_quit;
+	if (relay_port_quit != nullptr)
+	{
+		try {
+			relay_port_quit->stop();
+		}
+		catch (int error) {}
+
+		delete relay_port_quit;
+	}	
 	// end program here
 	exit(0);
 }

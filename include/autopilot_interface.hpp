@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Last Edit:  10/06/2022 (MM/DD/YYYY)
+ * Last Edit:  10/12/2022 (MM/DD/YYYY)
  *
  * Functions for sending and recieving commands to an autopilot via MAVlink
  */
@@ -45,8 +45,8 @@
 #include <unistd.h>  // UNIX standard function definitions
 #include <mutex>
 #include "thread_gen.hpp"
-
 #include <common/mavlink.h>
+#include "settings.hpp"
 
 // ------------------------------------------------------------------------------
 //   Defines
@@ -240,17 +240,19 @@ class Autopilot_Interface
 public:
 
 	Autopilot_Interface();
-	Autopilot_Interface(Generic_Port* port_);
-	Autopilot_Interface(Generic_Port* port_, std::string ip_addr_mocap_, int mocap_ID_);
+	Autopilot_Interface(Generic_Port* target_port_, settings_t& settings_);
+	Autopilot_Interface(Generic_Port* target_port_, Generic_Port* relay_port_, settings_t& settings_);
 	~Autopilot_Interface();	
 
 	char printf_status;
 	char vision_position_writing_status;
 	char sys_status;
 	char reading_status;
+	char relay_status;
 	char writing_status;
 	char control_status;
     uint64_t write_count;
+	uint64_t relay_write_count;
 
     int system_id;
 	int autopilot_id;
@@ -263,6 +265,7 @@ public:
 	void update_setpoint(mavlink_set_position_target_local_ned_t setpoint);
 	void read_messages();
 	int  write_message(mavlink_message_t message);
+	int relay_message(mavlink_message_t& message);
 
 	int	 arm_disarm( bool flag );
 	void enable_offboard_control(void);
@@ -271,46 +274,26 @@ public:
 	void start(void);
 	void stop(void);
 
-	void enable_control(void);
-	void enable_mocap(void);
-	void toggle_mocap_YUP2NED(bool in);
-	void toggle_mocap_ZUP2NED(bool in);
-	void enable_telemetry(void);
-	void enable_vpe(void);
-	void enable_print_mocap(void);
-	void enable_print_vpe(void);
-	void enable_print_control(void);
-	void enable_print_telemetry(void);
-
 	void start_vision_position_estimate_write_thread(void);
 	void start_read_thread(void);
 	void start_write_thread(void);
 	void start_printf_thread(void);
 	void start_sys_thread(void);
+	void start_relay_thread(void);
 
 	void handle_quit( int sig );
 
 private:
-	void init(Generic_Port* port_);
-	void init(Generic_Port* port_, std::string ip_addr_mocap_, int mocap_ID_);
+	void init(Generic_Port* target_port_, settings_t& settings_);
+	void init(Generic_Port* target_port_, Generic_Port* relay_port_ , settings_t& settings_);
 
-	bool enable_mocap_fl = false;
-	bool enable_vpe_fl = false;
-	bool enable_control_fl = false;
-	bool enable_telemetry_fl = false;
-	bool enable_printf_fl = false;
-	bool printf_mocap_fl = false;
-	bool printf_vpe_fl = false;
-	bool printf_control_fl = false;
-	bool printf_telemetry_fl = false;
+	settings_t settings;
 
 	Time_Stamps time_stamps_old;
 
 	mocap_node_t mocap;
-	int mocap_ID;	
-	std::string ip_addr_mocap = "127.0.0.1";
 
-	Generic_Port *port;
+	Generic_Port *target_port, *relay_port;
 
 	bool time_to_exit;
 
@@ -319,6 +302,7 @@ private:
 	thread_gen_t vision_position_estimate_write_tid;
 	thread_gen_t printf_tid;
 	thread_gen_t sys_tid;
+	thread_gen_t relay_tid;
 
 	struct {
 		std::mutex mutex;
@@ -337,11 +321,13 @@ private:
 	void vision_position_estimate_write_thread(void);
 	void printf_thread(void);
 	void sys_thread(void);
+	void relay_thread(void);
 
 	int toggle_offboard_control( bool flag );
 	void write_setpoint();
 	void write_vision_position_estimate();
 	void sys_write(void);
+	void relay_read(void);	
 	void print_header(void);
 	void print_data(void);
 };
