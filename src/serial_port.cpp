@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Last Edit:  10/12/2022 (MM/DD/YYYY)
+ * Last Edit:  10/14/2022 (MM/DD/YYYY)
  *
  * Functions for opening, closing, reading and writing via serial ports.
  */
@@ -87,7 +87,7 @@ int Serial_Port::bytes_available(void)
 {
 	return serial.available();
 }
-char Serial_Port::read_message(mavlink_message_t &message)
+char Serial_Port::read_message(mavlink_message_t &message, mavlink_channel_t mavlink_channel_)
 {	
 	uint8_t          msgReceived = false;
 
@@ -109,7 +109,7 @@ char Serial_Port::read_message(mavlink_message_t &message)
 		if (result > 0)
 		{
 			// the parsing
-			msgReceived = mavlink_parse_char(MAVLINK_COMM_0, cp, &message, &status);
+			msgReceived = mavlink_parse_char(mavlink_channel_, cp, &message, &status);
 
 			// check for dropped packets
 			if ((lastStatus.packet_rx_drop_count != status.packet_rx_drop_count) && debug)

@@ -116,6 +116,7 @@ void* start_autopilot_interface_write_thread(void *args);
 void* start_autopilot_interface_write_vision_position_estimate_thread(void* args);
 void* start_autopilot_interface_printf_thread(void* args);
 void* start_autopilot_interface_sys_thread(void* args);
+void* start_autopilot_interface_relay_thread(void* args);
 
 // ------------------------------------------------------------------------------
 //   Data Structures

@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Last Edit:  10/12/2022 (MM/DD/YYYY)
+ * Last Edit:  10/14/2022 (MM/DD/YYYY)
  *
  * Functions for sending and recieving commands to an autopilot via MAVlink
  */
@@ -300,7 +300,7 @@ void Autopilot_Interface::read_messages(void)
 	//   READ MESSAGE
 	// ----------------------------------------------------------------------
 	mavlink_message_t message;
-	success = target_port->read_message(message);
+	success = target_port->read_message(message, MAVLINK_COMM_0);
 
 	// ----------------------------------------------------------------------
 	//   HANDLE MESSAGE
@@ -449,6 +449,93 @@ void Autopilot_Interface::read_messages(void)
 			current_RX_messages.time_stamps.odometry = get_time_usec();
 			break;
 		}
+		case MAVLINK_MSG_ID_ALTITUDE:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_ALTITUDE\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_ACTUATOR_CONTROL_TARGET:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_ACTUATOR_CONTROL_TARGET\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_TIMESYNC:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_TIMESYNC\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_ESTIMATOR_STATUS:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_ESTIMATOR_STATUS\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_PING:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_PING\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_GPS_RAW_INT:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_GPS_RAW_INT\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_ATTITUDE_QUATERNION:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_ATTITUDE_QUATERNION\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_PARAM_REQUEST_LIST:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_PARAM_REQUEST_LIST\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_PARAM_EXT_REQUEST_READ:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_PARAM_EXT_REQUEST_READ\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_PARAM_EXT_SET:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_PARAM_EXT_SET\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_PARAM_EXT_VALUE:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_PARAM_EXT_VALUE\n");
+#endif // DEBUG
+			break;
+		}
 
 		default:
 		{
@@ -475,13 +562,221 @@ void Autopilot_Interface::relay_read(void)
 	// ----------------------------------------------------------------------
 	//   READ MESSAGE
 	// ----------------------------------------------------------------------
+
 	mavlink_message_t message;
-	success = relay_port->read_message(message);
+	success = relay_port->read_message(message, MAVLINK_COMM_1);
 
 	// ----------------------------------------------------------------------
 	//   HANDLE MESSAGE
 	// ----------------------------------------------------------------------
-	if (success) write_message(message);
+	if (success)
+	{
+		write_message(message);
+
+#ifdef DEBUG
+		printf("received msg to relay\n");
+		// Store message sysid and compid.
+		// Note this doesn't handle multiple message sources.
+		current_RX_messages.sysid = message.sysid;
+		current_RX_messages.compid = message.compid;
+
+		// Handle Message ID
+		switch (message.msgid)
+		{
+
+		case MAVLINK_MSG_ID_HEARTBEAT:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_HEARTBEAT\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_SYS_STATUS:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_SYS_STATUS\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_BATTERY_STATUS:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_BATTERY_STATUS\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_RADIO_STATUS:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_RADIO_STATUS\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_LOCAL_POSITION_NED:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_LOCAL_POSITION_NED\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_GLOBAL_POSITION_INT:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_GLOBAL_POSITION_INT\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_POSITION_TARGET_LOCAL_NED:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_POSITION_TARGET_LOCAL_NED\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_POSITION_TARGET_GLOBAL_INT:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_POSITION_TARGET_GLOBAL_INT\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_HIGHRES_IMU:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_HIGHRES_IMU\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_ATTITUDE:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_ATTITUDE\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_VISION_POSITION_ESTIMATE:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_VISION_POSITION_ESTIMATE\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_ODOMETRY:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_ODOMETRY\n");
+#endif // DEBUG
+			break;
+		}
+		case MAVLINK_MSG_ID_ALTITUDE:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_ALTITUDE\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_ACTUATOR_CONTROL_TARGET:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_ACTUATOR_CONTROL_TARGET\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_TIMESYNC:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_TIMESYNC\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_ESTIMATOR_STATUS:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_ESTIMATOR_STATUS\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_PING:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_PING\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_GPS_RAW_INT:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_GPS_RAW_INT\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_ATTITUDE_QUATERNION:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_ATTITUDE_QUATERNION\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_PARAM_REQUEST_LIST:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_PARAM_REQUEST_LIST\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_PARAM_EXT_REQUEST_READ:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_PARAM_EXT_REQUEST_READ\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_PARAM_EXT_SET:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_PARAM_EXT_SET\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_PARAM_EXT_VALUE:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_PARAM_EXT_VALUE\n");
+#endif // DEBUG
+			break;
+		}
+
+		default:
+		{
+#ifdef DEBUG
+			printf("Warning, did not handle message id %i\n", message.msgid);
+#endif // DEBUG
+			break;
+		}
+		}
+#endif // DEBUG
+	}
 	return;
 }
 
@@ -826,6 +1121,16 @@ void Autopilot_Interface::start(void)
 #ifdef DEBUG
 		printf("Good.\n");
 #endif // DEBUG
+
+		// Start Relay thread:
+#ifdef DEBUG
+		printf("Starting Relay thread...\n");
+#endif // DEBUG
+		result = sys_tid.start(&start_autopilot_interface_relay_thread, this);
+		if (result) throw result;
+#ifdef DEBUG
+		printf("Relay thread started!\n");
+#endif // DEBUG	
 	}
 
 

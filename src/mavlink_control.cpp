@@ -80,7 +80,7 @@ int top (int argc, char **argv)
 	settings.relay_use_udp = false;
 	settings.relay_ip = (char*)"127.0.0.1";
 	settings.relay_port = 14550;
-	settings.relay_bind_port = 14551;
+	settings.relay_bind_port = 14555;
 
 
 	settings.autotakeoff = false;
@@ -553,7 +553,7 @@ char parse_commandline(int argc, char **argv, settings_t& settings)
 		}
 		
 		// target UDP bind port
-		if (strcmp(argv[i], "-tb") == 0 || strcmp(argv[i], "--target_bind_port") == 0) {
+		if (strcmp(argv[i], "-tbp") == 0 || strcmp(argv[i], "--target_bind_port") == 0) {
 			if (argc > i + 1) {
 				i++;
 				settings.enable_target = true;

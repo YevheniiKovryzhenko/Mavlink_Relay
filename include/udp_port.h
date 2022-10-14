@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Last Edit:  10/12/2022 (MM/DD/YYYY)
+ * Last Edit:  10/14/2022 (MM/DD/YYYY)
  *
  * Functions for opening, closing, reading and writing via UDP ports.
  */
@@ -84,7 +84,7 @@ public:
 	UDP_Port(const char *target_ip_, int targetPort_, int bind_port_);
 	virtual ~UDP_Port();
 
-	char read_message(mavlink_message_t &message);
+	char read_message(mavlink_message_t &message, mavlink_channel_t mavlink_channel_);
 	int write_message(const mavlink_message_t &message);
 
 	bool is_running(){
@@ -119,6 +119,7 @@ private:
 	
 
 	int  _read_port(uint8_t &cp);
+	//int _read_bind_port(uint8_t& cp);
 	int _write_port(char *buf, unsigned len);
 
 };

@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Last Edit:  10/12/2022 (MM/DD/YYYY)
+ * Last Edit:  10/14/2022 (MM/DD/YYYY)
  *
  * Functions for opening, closing, reading and writing via serial ports.
  */
@@ -70,7 +70,7 @@ public:
 	Serial_Port(const char *uart_name_, int baudrate_);
 	virtual ~Serial_Port();
 
-	char read_message(mavlink_message_t &message);
+	char read_message(mavlink_message_t &message, mavlink_channel_t mavlink_channel_);
 	int write_message(const mavlink_message_t &message);
 
 	bool is_running(){
