@@ -313,7 +313,7 @@ void commands(Autopilot_Interface &api, bool autotakeoff)
 	// Example 1 - Fly up by to 2m
 	set_position( ip.x ,       // [m]
 			 	  ip.y ,       // [m]
-				  ip.z - 2.0 , // [m]
+				  ip.z - 1.0 , // [m]
 				  sp         );
 
 	if(autotakeoff)
@@ -337,14 +337,14 @@ void commands(Autopilot_Interface &api, bool autotakeoff)
 
 
 	// Example 2 - Set Velocity
-	set_velocity( -1.0       , // [m/s]
-				  -1.0       , // [m/s]
-				   0.0       , // [m/s]
-				   sp        );
+	//set_velocity( -1.0       , // [m/s]
+	//			  -1.0       , // [m/s]
+	//			   0.0       , // [m/s]
+	//			   sp        );
 
 	// Example 2.1 - Append Yaw Command
-	set_yaw( ip.yaw + 90.0/180.0*M_PI, // [rad]
-			 sp     );
+	//set_yaw( ip.yaw + 90.0/180.0*M_PI, // [rad]
+	//		 sp     );
 
 	// SEND THE COMMAND
 	api.update_setpoint(sp);
@@ -472,9 +472,9 @@ char parse_commandline(int argc, char **argv, settings_t& settings)
 		"-m 			--mocap_ip					specify mocap interface						127.0.0.1\n"
 		"-mI			--mocap_ID  					specify frame ID from mocap					1\n"
 		"-mY			--mocap_YUP2NED					rotate from Y-Up to NED 					false\n"
-		"-mZ			--mocap_ZUP2NED					rotate from Z-Up to NED 					false\n"
-		"-c 			--enable_control				enable control algorithm					false\n\n"
-		"-t 			--disable_telem					disable telemetry send/receive					false\n"		
+		"-mZ			--mocap_ZUP2NED					rotate from Z-Up to NED 					false\n\n"
+		"-c 			--enable_control				enable control algorithm					false\n"
+		"-t 			--disable_telem					disable telemetry send/receive					false\n\n"		
 		"-pc			--print_control					print setpoints to console					false\n"
 		"-pm			--print_mocap					print mocap tracking						false\n"
 		"-pv			--print_vpe 					print vision position estimate					false\n"
