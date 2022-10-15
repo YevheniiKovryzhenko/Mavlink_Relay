@@ -295,7 +295,8 @@ void Autopilot_Interface::update_setpoint(mavlink_set_position_target_local_ned_
 // ------------------------------------------------------------------------------
 void Autopilot_Interface::read_messages(void)
 {
-	bool success;               // receive success flag
+	bool success;               // receive success flag	
+
 	// ----------------------------------------------------------------------
 	//   READ MESSAGE
 	// ----------------------------------------------------------------------
@@ -323,7 +324,8 @@ void Autopilot_Interface::read_messages(void)
 #ifdef DEBUG
 			printf("MAVLINK_MSG_ID_HEARTBEAT\n");
 #endif // DEBUG
-			mavlink_msg_heartbeat_decode(&message, &(current_RX_messages.heartbeat));
+			std::lock_guard<std::mutex> lock(current_RX_messages.heartbeat.mutex);
+			mavlink_msg_heartbeat_decode(&message, &(current_RX_messages.heartbeat.data));
 			time_stamps_old.heartbeat = current_RX_messages.time_stamps.heartbeat;
 			current_RX_messages.time_stamps.heartbeat = get_time_usec();
 			break;
@@ -334,7 +336,8 @@ void Autopilot_Interface::read_messages(void)
 #ifdef DEBUG
 			printf("MAVLINK_MSG_ID_SYS_STATUS\n");
 #endif // DEBUG
-			mavlink_msg_sys_status_decode(&message, &(current_RX_messages.sys_status));
+			std::lock_guard<std::mutex> lock(current_RX_messages.sys_status.mutex);
+			mavlink_msg_sys_status_decode(&message, &(current_RX_messages.sys_status.data));
 			time_stamps_old.sys_status = current_RX_messages.time_stamps.sys_status;
 			current_RX_messages.time_stamps.sys_status = get_time_usec();
 			break;
@@ -345,7 +348,8 @@ void Autopilot_Interface::read_messages(void)
 #ifdef DEBUG
 			printf("MAVLINK_MSG_ID_BATTERY_STATUS\n");
 #endif // DEBUG
-			mavlink_msg_battery_status_decode(&message, &(current_RX_messages.battery_status));
+			std::lock_guard<std::mutex> lock(current_RX_messages.battery_status.mutex);
+			mavlink_msg_battery_status_decode(&message, &(current_RX_messages.battery_status.data));
 			time_stamps_old.battery_status = current_RX_messages.time_stamps.battery_status;
 			current_RX_messages.time_stamps.battery_status = get_time_usec();
 			break;
@@ -356,7 +360,8 @@ void Autopilot_Interface::read_messages(void)
 #ifdef DEBUG
 			printf("MAVLINK_MSG_ID_RADIO_STATUS\n");
 #endif // DEBUG
-			mavlink_msg_radio_status_decode(&message, &(current_RX_messages.radio_status));
+			std::lock_guard<std::mutex> lock(current_RX_messages.radio_status.mutex);
+			mavlink_msg_radio_status_decode(&message, &(current_RX_messages.radio_status.data));
 			time_stamps_old.radio_status = current_RX_messages.time_stamps.radio_status;
 			current_RX_messages.time_stamps.radio_status = get_time_usec();
 			break;
@@ -367,7 +372,8 @@ void Autopilot_Interface::read_messages(void)
 #ifdef DEBUG
 			printf("MAVLINK_MSG_ID_LOCAL_POSITION_NED\n");
 #endif // DEBUG
-			mavlink_msg_local_position_ned_decode(&message, &(current_RX_messages.local_position_ned));
+			std::lock_guard<std::mutex> lock(current_RX_messages.local_position_ned.mutex);
+			mavlink_msg_local_position_ned_decode(&message, &(current_RX_messages.local_position_ned.data));
 			time_stamps_old.local_position_ned = current_RX_messages.time_stamps.local_position_ned;
 			current_RX_messages.time_stamps.local_position_ned = get_time_usec();
 			break;
@@ -378,7 +384,8 @@ void Autopilot_Interface::read_messages(void)
 #ifdef DEBUG
 			printf("MAVLINK_MSG_ID_GLOBAL_POSITION_INT\n");
 #endif // DEBUG
-			mavlink_msg_global_position_int_decode(&message, &(current_RX_messages.global_position_int));
+			std::lock_guard<std::mutex> lock(current_RX_messages.global_position_int.mutex);
+			mavlink_msg_global_position_int_decode(&message, &(current_RX_messages.global_position_int.data));
 			time_stamps_old.global_position_int = current_RX_messages.time_stamps.global_position_int;
 			current_RX_messages.time_stamps.global_position_int = get_time_usec();
 			break;
@@ -389,7 +396,8 @@ void Autopilot_Interface::read_messages(void)
 #ifdef DEBUG
 			printf("MAVLINK_MSG_ID_POSITION_TARGET_LOCAL_NED\n");
 #endif // DEBUG
-			mavlink_msg_position_target_local_ned_decode(&message, &(current_RX_messages.position_target_local_ned));
+			std::lock_guard<std::mutex> lock(current_RX_messages.position_target_local_ned.mutex);
+			mavlink_msg_position_target_local_ned_decode(&message, &(current_RX_messages.position_target_local_ned.data));
 			time_stamps_old.position_target_local_ned = current_RX_messages.time_stamps.position_target_local_ned;
 			current_RX_messages.time_stamps.position_target_local_ned = get_time_usec();
 			break;
@@ -400,7 +408,8 @@ void Autopilot_Interface::read_messages(void)
 #ifdef DEBUG
 			printf("MAVLINK_MSG_ID_POSITION_TARGET_GLOBAL_INT\n");
 #endif // DEBUG
-			mavlink_msg_position_target_global_int_decode(&message, &(current_RX_messages.position_target_global_int));
+			std::lock_guard<std::mutex> lock(current_RX_messages.position_target_global_int.mutex);
+			mavlink_msg_position_target_global_int_decode(&message, &(current_RX_messages.position_target_global_int.data));
 			time_stamps_old.position_target_global_int = current_RX_messages.time_stamps.position_target_global_int;
 			current_RX_messages.time_stamps.position_target_global_int = get_time_usec();
 			break;
@@ -411,7 +420,8 @@ void Autopilot_Interface::read_messages(void)
 #ifdef DEBUG
 			printf("MAVLINK_MSG_ID_HIGHRES_IMU\n");
 #endif // DEBUG
-			mavlink_msg_highres_imu_decode(&message, &(current_RX_messages.highres_imu));
+			std::lock_guard<std::mutex> lock(current_RX_messages.highres_imu.mutex);
+			mavlink_msg_highres_imu_decode(&message, &(current_RX_messages.highres_imu.data));
 			time_stamps_old.highres_imu = current_RX_messages.time_stamps.highres_imu;
 			current_RX_messages.time_stamps.highres_imu = get_time_usec();
 			break;
@@ -422,7 +432,8 @@ void Autopilot_Interface::read_messages(void)
 #ifdef DEBUG
 			printf("MAVLINK_MSG_ID_ATTITUDE\n");
 #endif // DEBUG
-			mavlink_msg_attitude_decode(&message, &(current_RX_messages.attitude));
+			std::lock_guard<std::mutex> lock(current_RX_messages.attitude.mutex);
+			mavlink_msg_attitude_decode(&message, &(current_RX_messages.attitude.data));
 			time_stamps_old.attitude = current_RX_messages.time_stamps.attitude;
 			current_RX_messages.time_stamps.attitude = get_time_usec();
 			break;
@@ -433,7 +444,8 @@ void Autopilot_Interface::read_messages(void)
 #ifdef DEBUG
 			printf("MAVLINK_MSG_ID_VISION_POSITION_ESTIMATE\n");
 #endif // DEBUG
-			mavlink_msg_vision_position_estimate_decode(&message, &(current_RX_messages.vision_position_estimate));
+			std::lock_guard<std::mutex> lock(current_RX_messages.vision_position_estimate.mutex);
+			mavlink_msg_vision_position_estimate_decode(&message, &(current_RX_messages.vision_position_estimate.data));
 			time_stamps_old.vision_position_estimate = current_RX_messages.time_stamps.vision_position_estimate;
 			current_RX_messages.time_stamps.vision_position_estimate = get_time_usec();
 			break;
@@ -444,7 +456,8 @@ void Autopilot_Interface::read_messages(void)
 #ifdef DEBUG
 			printf("MAVLINK_MSG_ID_ODOMETRY\n");
 #endif // DEBUG
-			mavlink_msg_odometry_decode(&message, &(current_RX_messages.odometry));
+			std::lock_guard<std::mutex> lock(current_RX_messages.odometry.mutex);
+			mavlink_msg_odometry_decode(&message, &(current_RX_messages.odometry.data));
 			time_stamps_old.odometry = current_RX_messages.time_stamps.odometry;
 			current_RX_messages.time_stamps.odometry = get_time_usec();
 			break;
@@ -454,6 +467,11 @@ void Autopilot_Interface::read_messages(void)
 #ifdef DEBUG
 			printf("MAVLINK_MSG_ID_ALTITUDE\n");
 #endif // DEBUG
+			std::lock_guard<std::mutex> lock(current_RX_messages.altitude.mutex);
+			mavlink_msg_altitude_decode(&message, &(current_RX_messages.altitude.data));
+			time_stamps_old.altitude = current_RX_messages.time_stamps.altitude;
+			current_RX_messages.time_stamps.altitude = get_time_usec();
+
 			break;
 		}
 
@@ -470,6 +488,7 @@ void Autopilot_Interface::read_messages(void)
 #ifdef DEBUG
 			printf("MAVLINK_MSG_ID_TIMESYNC\n");
 #endif // DEBUG
+			
 			break;
 		}
 
@@ -478,6 +497,11 @@ void Autopilot_Interface::read_messages(void)
 #ifdef DEBUG
 			printf("MAVLINK_MSG_ID_ESTIMATOR_STATUS\n");
 #endif // DEBUG
+			std::lock_guard<std::mutex> lock(current_RX_messages.estimator_status.mutex);
+			mavlink_msg_estimator_status_decode(&message, &(current_RX_messages.estimator_status.data));
+			time_stamps_old.estimator_status = current_RX_messages.time_stamps.estimator_status;
+			current_RX_messages.time_stamps.estimator_status = get_time_usec();
+
 			break;
 		}
 
@@ -1258,6 +1282,73 @@ void Autopilot_Interface::start(void)
 			printf("Waiting for telemetry...\n");
 			if (settings.enable_control)
 			{
+				printf("Attitude update...");
+				while (not (current_RX_messages.time_stamps.attitude && (current_RX_messages.estimator_status.data.flags & ESTIMATOR_ATTITUDE) == ESTIMATOR_ATTITUDE))
+				{
+					if (time_to_exit)
+						return;
+					usleep(500000);
+				}
+				printf("\tOK\n");			
+				
+				printf("Horizontal velocity...");
+				while (not ((current_RX_messages.estimator_status.data.flags & ESTIMATOR_VELOCITY_HORIZ) == ESTIMATOR_VELOCITY_HORIZ))
+				{
+					if (time_to_exit)
+						return;
+					usleep(500000);
+				}
+				printf("\tOK\n");
+
+				printf("Vertical velocity...");
+				while (not ((current_RX_messages.estimator_status.data.flags & ESTIMATOR_VELOCITY_VERT) == ESTIMATOR_VELOCITY_VERT))
+				{
+					if (time_to_exit)
+						return;
+					usleep(500000);
+				}
+				printf("\tOK\n");
+
+				printf("Horizontal Position...");
+				while (not ((\
+					(current_RX_messages.estimator_status.data.flags & ESTIMATOR_POS_HORIZ_REL) == ESTIMATOR_POS_HORIZ_REL\
+					) && (\
+					(current_RX_messages.estimator_status.data.flags & ESTIMATOR_POS_HORIZ_ABS) == ESTIMATOR_POS_HORIZ_ABS\
+					)))
+				{
+					if (time_to_exit)
+						return;
+					usleep(500000);
+				}
+				printf("\tOK\n");
+
+				printf("Vertical Position...");
+				while (not ((\
+					(current_RX_messages.estimator_status.data.flags & ESTIMATOR_POS_VERT_ABS) == ESTIMATOR_POS_VERT_ABS\
+					) && (\
+						(current_RX_messages.estimator_status.data.flags & ESTIMATOR_POS_VERT_AGL) == ESTIMATOR_POS_VERT_AGL\
+						)))
+				{
+					if (time_to_exit)
+						return;
+					usleep(500000);
+				}
+				printf("\tOK\n");
+
+				printf("Horisonatal Position Prediction...");
+				while (not ((\
+					(current_RX_messages.estimator_status.data.flags & ESTIMATOR_PRED_POS_HORIZ_REL) == ESTIMATOR_PRED_POS_HORIZ_REL\
+					) && (\
+						(current_RX_messages.estimator_status.data.flags & ESTIMATOR_PRED_POS_HORIZ_ABS) == ESTIMATOR_PRED_POS_HORIZ_ABS\
+						)))
+				{
+					if (time_to_exit)
+						return;
+					usleep(500000);
+				}
+				printf("\tOK\n");
+
+				printf("Intiial Position and Velocity...");
 				while (not (current_RX_messages.time_stamps.local_position_ned &&
 					current_RX_messages.time_stamps.attitude))
 				{
@@ -1265,21 +1356,25 @@ void Autopilot_Interface::start(void)
 						return;
 					usleep(500000);
 				}
-				printf("Got initial attitude and position!\n");
+				printf("\tOK\n");
+				//sleep(3);
 
 				// copy initial position ned
-				Mavlink_Messages local_data = current_RX_messages;
-				initial_position.x = local_data.local_position_ned.x;
-				initial_position.y = local_data.local_position_ned.y;
-				initial_position.z = local_data.local_position_ned.z;
-				initial_position.vx = local_data.local_position_ned.vx;
-				initial_position.vy = local_data.local_position_ned.vy;
-				initial_position.vz = local_data.local_position_ned.vz;
-				initial_position.yaw = local_data.attitude.yaw;
-				initial_position.yaw_rate = local_data.attitude.yawspeed;
-
+				{
+					std::lock_guard<std::mutex> lock(current_RX_messages.local_position_ned.mutex);
+					//Mavlink_Messages local_data = current_RX_messages;
+					initial_position.x = current_RX_messages.local_position_ned.data.x;
+					initial_position.y = current_RX_messages.local_position_ned.data.y;
+					initial_position.z = current_RX_messages.local_position_ned.data.z;
+					initial_position.vx = current_RX_messages.local_position_ned.data.vx;
+					initial_position.vy = current_RX_messages.local_position_ned.data.vy;
+					initial_position.vz = current_RX_messages.local_position_ned.data.vz;
+					initial_position.yaw = current_RX_messages.attitude.data.yaw;
+					initial_position.yaw_rate = current_RX_messages.attitude.data.yawspeed;
+				}
 #ifdef DEBUG
 				printf("INITIAL POSITION XYZ = [ %.4f , %.4f , %.4f ] \n", initial_position.x, initial_position.y, initial_position.z);
+				printf("INITIAL VELOCITY XYZ = [ %.4f , %.4f , %.4f ] \n", initial_position.vx, initial_position.vy, initial_position.vz);
 				printf("INITIAL POSITION YAW = %.4f \n", initial_position.yaw);
 				printf("\n");
 #endif // DEBUG	
@@ -1576,7 +1671,7 @@ void Autopilot_Interface::print_data(void)
 	// make a local copy of all the data
 	mavlink_vision_position_estimate_t vpe;
 	mavlink_set_position_target_local_ned_t sp;
-	Mavlink_Messages mav;
+	//Mavlink_Messages mav;
 	Time_Stamps mav_time_stamps_old;
 	uint64_t sp_time_ms_old;
 	uint64_t vpe_time_us_old;
@@ -1604,7 +1699,7 @@ void Autopilot_Interface::print_data(void)
 	}
 	if (settings.enable_telemetry && settings.print_telemetry)
 	{
-		mav = current_RX_messages;
+		
 		mav_time_stamps_old = time_stamps_old;
 	}
 
@@ -1632,6 +1727,7 @@ void Autopilot_Interface::print_data(void)
 	}
 	if (settings.enable_control && settings.print_control)
 	{
+		//if ((sp.type_mask & MAVLINK_MSG_SET_POSITION_TARGET_LOCAL_NED_POSITION) == MAVLINK_MSG_SET_POSITION_TARGET_LOCAL_NED_POSITION)
 		PRINT_DATA((1.0E3 / (sp.time_boot_ms - sp_time_ms_old)));
 		PRINT_DATA(sp.x);
 		PRINT_DATA(sp.y);
@@ -1644,14 +1740,16 @@ void Autopilot_Interface::print_data(void)
 	}
 	if (settings.enable_telemetry && settings.print_telemetry)
 	{
-		PRINT_DATA((1.0E6 / (mav.time_stamps.attitude - mav_time_stamps_old.attitude)));
-		PRINT_DATA(mav.attitude.roll);
-		PRINT_DATA(mav.attitude.pitch);
-		PRINT_DATA(mav.attitude.yaw);
-		PRINT_DATA((1.0E6 / (mav.time_stamps.local_position_ned - mav_time_stamps_old.local_position_ned)));
-		PRINT_DATA(mav.local_position_ned.x);
-		PRINT_DATA(mav.local_position_ned.y);
-		PRINT_DATA(mav.local_position_ned.z);
+		std::lock_guard<std::mutex> lock(current_RX_messages.attitude.mutex);
+		PRINT_DATA((1.0E6 / (current_RX_messages.time_stamps.attitude - mav_time_stamps_old.attitude)));
+		PRINT_DATA(current_RX_messages.attitude.data.roll);
+		PRINT_DATA(current_RX_messages.attitude.data.pitch);
+		PRINT_DATA(current_RX_messages.attitude.data.yaw);
+		std::lock_guard<std::mutex> lock2(current_RX_messages.local_position_ned.mutex);
+		PRINT_DATA((1.0E6 / (current_RX_messages.time_stamps.local_position_ned - mav_time_stamps_old.local_position_ned)));
+		PRINT_DATA(current_RX_messages.local_position_ned.data.x);
+		PRINT_DATA(current_RX_messages.local_position_ned.data.y);
+		PRINT_DATA(current_RX_messages.local_position_ned.data.z);
 
 	}
 	fflush(stdout);

@@ -22,14 +22,14 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Last Edit:  10/12/2022 (MM/DD/YYYY)
+ * Last Edit:  10/14/2022 (MM/DD/YYYY)
  *
  * Functions for sending and recieving commands to an autopilot via MAVlink
  */
 
 
-#ifndef AUTOPILOT_INTERFACE_H_
-#define AUTOPILOT_INTERFACE_H_
+#ifndef AUTOPILOT_INTERFACE_HPP
+#define AUTOPILOT_INTERFACE_HPP
 
 // ------------------------------------------------------------------------------
 //   Includes
@@ -141,9 +141,10 @@ struct Time_Stamps
 	uint64_t attitude;
 	uint64_t vision_position_estimate;
 	uint64_t odometry;
+	uint64_t altitude;
+	uint64_t estimator_status;
 
-	void
-	reset_timestamps()
+	void reset_timestamps()
 	{
 		heartbeat = 0;
 		sys_status = 0;
@@ -154,8 +155,11 @@ struct Time_Stamps
 		position_target_local_ned = 0;
 		position_target_global_int = 0;
 		highres_imu = 0;
-		attitude = 0;		
+		attitude = 0;
 		vision_position_estimate = 0;
+		odometry = 0;
+		altitude = 0;
+		estimator_status = 0;
 	}
 
 };
@@ -163,47 +167,95 @@ struct Time_Stamps
 
 // Struct containing information on the MAV we are currently connected to
 
-struct Mavlink_Messages {
+struct Mavlink_Messages {	
 
 	int sysid;
 	int compid;
 
 	// Heartbeat
-	mavlink_heartbeat_t heartbeat;
+	struct {
+		std::mutex mutex;
+		mavlink_heartbeat_t data;
+	}heartbeat;
 
 	// System Status
-	mavlink_sys_status_t sys_status;
+	struct {
+		std::mutex mutex;
+		mavlink_sys_status_t data;
+	}sys_status;
 
 	// Battery Status
-	mavlink_battery_status_t battery_status;
+	struct {
+		std::mutex mutex;
+		mavlink_battery_status_t data;
+	}battery_status;
 
 	// Radio Status
-	mavlink_radio_status_t radio_status;
+	struct {
+		std::mutex mutex;
+		mavlink_radio_status_t data;
+	}radio_status;
 
 	// Local Position
-	mavlink_local_position_ned_t local_position_ned;
+	struct {
+		std::mutex mutex;
+		mavlink_local_position_ned_t data;
+	}local_position_ned;
 
 	// Global Position
-	mavlink_global_position_int_t global_position_int;
+	struct {
+		std::mutex mutex;
+		mavlink_global_position_int_t data;
+	}global_position_int;
 
 	// Local Position Target
-	mavlink_position_target_local_ned_t position_target_local_ned;
+	struct {
+		std::mutex mutex;
+		mavlink_position_target_local_ned_t data;
+	}position_target_local_ned;
 
 	// Global Position Target
-	mavlink_position_target_global_int_t position_target_global_int;
+	struct {
+		std::mutex mutex;
+		mavlink_position_target_global_int_t data;
+	}position_target_global_int;
 
 	// HiRes IMU
-	mavlink_highres_imu_t highres_imu;
+	struct {
+		std::mutex mutex;
+		mavlink_highres_imu_t data;
+	}highres_imu;
 
 	// Attitude
-	mavlink_attitude_t attitude;
+	struct {
+		std::mutex mutex;
+		mavlink_attitude_t data;
+	}attitude;
 
 	// Vision position and attitude estimate
-	mavlink_vision_position_estimate_t vision_position_estimate;
+	struct {
+		std::mutex mutex;
+		mavlink_vision_position_estimate_t data;
+	}vision_position_estimate;
 
 	// Odometry
-	mavlink_odometry_t odometry;
+	struct {
+		std::mutex mutex;
+		mavlink_odometry_t data;
+	}odometry;
+
+	// Altitude
+	struct {
+		std::mutex mutex;
+		mavlink_altitude_t data;
+	}altitude;
 	
+	// Estimator status
+	struct {
+		std::mutex mutex;
+		mavlink_estimator_status_t data;
+	}estimator_status;
+
 	// System Parameters?
 
 
@@ -257,10 +309,12 @@ public:
 
     int system_id;
 	int autopilot_id;
-	int companion_id;	
+	int companion_id;
 
 	Mavlink_Messages current_RX_messages;
-	Mavlink_Messages current_TX_messages;
+	
+	
+	//Mavlink_Messages current_TX_messages;
 	mavlink_set_position_target_local_ned_t initial_position;
 
 	void update_setpoint(mavlink_set_position_target_local_ned_t setpoint);
@@ -335,6 +389,6 @@ private:
 
 
 
-#endif // AUTOPILOT_INTERFACE_H_
+#endif // AUTOPILOT_INTERFACE_HPP
 
 
