@@ -276,8 +276,7 @@ int top (int argc, char **argv)
 // ------------------------------------------------------------------------------
 
 void commands(Autopilot_Interface &api, bool autotakeoff)
-{
-#define DEBUG
+{		
 	// --------------------------------------------------------------------------
 	//   START OFFBOARD MODE
 	// --------------------------------------------------------------------------
@@ -294,7 +293,7 @@ void commands(Autopilot_Interface &api, bool autotakeoff)
 		usleep(100); // give some time to let it sink in
 	//}
 
-		return;
+		//return;
 	// --------------------------------------------------------------------------
 	//   SEND OFFBOARD COMMANDS
 	// --------------------------------------------------------------------------

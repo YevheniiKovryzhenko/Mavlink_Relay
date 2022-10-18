@@ -928,10 +928,8 @@ void Autopilot_Interface::write_setpoint(void)
 	// --------------------------------------------------------------------------
 	//   ENCODE
 	// --------------------------------------------------------------------------
-
 	mavlink_message_t message;
 	mavlink_msg_set_position_target_local_ned_encode(system_id, companion_id, &message, &sp);
-
 
 	// --------------------------------------------------------------------------
 	//   WRITE
@@ -946,7 +944,6 @@ void Autopilot_Interface::write_setpoint(void)
 
 	return;
 }
-
 
 // ------------------------------------------------------------------------------
 //   Start Off-Board Mode
@@ -1052,7 +1049,8 @@ Autopilot_Interface::arm_disarm( bool flag )
 	mavlink_msg_command_long_encode(system_id, companion_id, &message, &com);
 
 	// Send the message
-	int len = target_port->write_message(message);
+	//int len = target_port->write_message(message);
+	int len = write_message(message);
 
 	// Done!
 	return len;
@@ -1061,8 +1059,7 @@ Autopilot_Interface::arm_disarm( bool flag )
 // ------------------------------------------------------------------------------
 //   Toggle Off-Board Mode
 // ------------------------------------------------------------------------------
-int
-Autopilot_Interface::toggle_offboard_control( bool flag )
+int Autopilot_Interface::toggle_offboard_control( bool flag )
 {
 	// Prepare command for off-board mode
 	mavlink_command_long_t com = { 0 };
@@ -1077,7 +1074,8 @@ Autopilot_Interface::toggle_offboard_control( bool flag )
 	mavlink_msg_command_long_encode(system_id, companion_id, &message, &com);
 
 	// Send the message
-	int len = target_port->write_message(message);
+	//int len = target_port->write_message(message);
+	int len = write_message(message);
 
 	// Done!
 	return len;
@@ -1853,7 +1851,7 @@ void Autopilot_Interface::write_thread(void)
 		std::lock_guard<std::mutex> lock(current_setpoint.mutex);
 		current_setpoint.data = sp;
 	}
-
+	printf("writing something\n");
 	// write a message and signal writing
 	write_setpoint();
 	writing_status = true;
