@@ -228,7 +228,7 @@ int top (int argc, char **argv)
 		// --------------------------------------------------------------------------
 		//   RUN COMMANDS
 		// --------------------------------------------------------------------------
-
+		sleep(3);
 		/*
 		* Now we can implement the algorithm we want on top of the autopilot interface
 		*/
@@ -282,7 +282,7 @@ void commands(Autopilot_Interface &api, bool autotakeoff)
 	// --------------------------------------------------------------------------
 
 	api.enable_offboard_control();
-	usleep(100); // give some time to let it sink in
+	usleep(10000); // give some time to let it sink in
 
 	// now the autopilot is accepting setpoint commands
 
@@ -303,6 +303,7 @@ void commands(Autopilot_Interface &api, bool autotakeoff)
 
 	// initialize command data strtuctures
 	mavlink_set_position_target_local_ned_t sp;
+	api.get_setpoint(sp);
 	mavlink_set_position_target_local_ned_t ip = api.initial_position;
 
 	// autopilot_interface.h provides some helper functions to build the command
@@ -347,7 +348,7 @@ void commands(Autopilot_Interface &api, bool autotakeoff)
 	//		 sp     );
 
 	// SEND THE COMMAND
-	api.update_setpoint(sp);
+	//api.update_setpoint(sp);
 	// NOW pixhawk will try to move
 
 	// Wait for 4 seconds, check position
@@ -360,8 +361,8 @@ void commands(Autopilot_Interface &api, bool autotakeoff)
 		sleep(1);
 	}
 
-	if(autotakeoff)
-	{
+	//if(autotakeoff)
+	//{
 		// Example 3 - Land using fixed velocity
 		set_velocity(  0.0       , // [m/s]
 					   0.0       , // [m/s]
@@ -390,7 +391,7 @@ void commands(Autopilot_Interface &api, bool autotakeoff)
 		// disarm autopilot
 		api.arm_disarm(false);
 		usleep(100); // give some time to let it sink in
-	}
+	//}
 
 	// --------------------------------------------------------------------------
 	//   STOP OFFBOARD MODE

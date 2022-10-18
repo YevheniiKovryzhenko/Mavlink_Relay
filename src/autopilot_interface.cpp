@@ -288,6 +288,12 @@ void Autopilot_Interface::update_setpoint(mavlink_set_position_target_local_ned_
 {
 	std::lock_guard<std::mutex> lock(current_setpoint.mutex);
 	current_setpoint.data = setpoint;
+	current_setpoint.data.time_boot_ms = get_time_usec() / 1000;
+}
+void Autopilot_Interface::get_setpoint(mavlink_set_position_target_local_ned_t& setpoint)
+{
+	std::lock_guard<std::mutex> lock(current_setpoint.mutex);
+	setpoint = current_setpoint.data;
 }
 
 // ------------------------------------------------------------------------------
@@ -909,6 +915,7 @@ void Autopilot_Interface::write_setpoint(void)
 	//   PACK PAYLOAD
 	// --------------------------------------------------------------------------
 
+	if (current_setpoint.time_ms_old == current_setpoint.data.time_boot_ms) return;
 
 	// pull from position target
 	mavlink_set_position_target_local_ned_t sp;
@@ -919,8 +926,8 @@ void Autopilot_Interface::write_setpoint(void)
 	}
 
 	// double check some system parameters
-	if ( not sp.time_boot_ms )
-		sp.time_boot_ms = (uint32_t) (get_time_usec()/1000);
+	//if ( not sp.time_boot_ms )
+	//	sp.time_boot_ms = (uint32_t)(get_time_usec() / 1000);
 	sp.target_system    = system_id;
 	sp.target_component = autopilot_id;
 
@@ -1278,9 +1285,11 @@ void Autopilot_Interface::start(void)
 
 			// Wait for initial position ned
 			printf("Waiting for telemetry...\n");
+			sleep(3);
 			if (settings.enable_control)
 			{
 				printf("Attitude update...");
+				usleep(10000);
 				while (not (current_RX_messages.time_stamps.attitude && (current_RX_messages.estimator_status.data.flags & ESTIMATOR_ATTITUDE) == ESTIMATOR_ATTITUDE))
 				{
 					if (time_to_exit)
@@ -1290,6 +1299,7 @@ void Autopilot_Interface::start(void)
 				printf("\tOK\n");			
 				
 				printf("Horizontal velocity...");
+				usleep(10000);
 				while (not ((current_RX_messages.estimator_status.data.flags & ESTIMATOR_VELOCITY_HORIZ) == ESTIMATOR_VELOCITY_HORIZ))
 				{
 					if (time_to_exit)
@@ -1299,6 +1309,7 @@ void Autopilot_Interface::start(void)
 				printf("\tOK\n");
 
 				printf("Vertical velocity...");
+				usleep(10000);
 				while (not ((current_RX_messages.estimator_status.data.flags & ESTIMATOR_VELOCITY_VERT) == ESTIMATOR_VELOCITY_VERT))
 				{
 					if (time_to_exit)
@@ -1308,6 +1319,7 @@ void Autopilot_Interface::start(void)
 				printf("\tOK\n");
 
 				printf("Horizontal Position...");
+				usleep(10000);
 				while (not ((\
 					(current_RX_messages.estimator_status.data.flags & ESTIMATOR_POS_HORIZ_REL) == ESTIMATOR_POS_HORIZ_REL\
 					) && (\
@@ -1321,6 +1333,7 @@ void Autopilot_Interface::start(void)
 				printf("\tOK\n");
 
 				printf("Vertical Position...");
+				usleep(10000);
 				while (not ((\
 					(current_RX_messages.estimator_status.data.flags & ESTIMATOR_POS_VERT_ABS) == ESTIMATOR_POS_VERT_ABS\
 					) && (\
@@ -1334,6 +1347,7 @@ void Autopilot_Interface::start(void)
 				printf("\tOK\n");
 
 				printf("Horisonatal Position Prediction...");
+				usleep(10000);
 				while (not ((\
 					(current_RX_messages.estimator_status.data.flags & ESTIMATOR_PRED_POS_HORIZ_REL) == ESTIMATOR_PRED_POS_HORIZ_REL\
 					) && (\
@@ -1347,6 +1361,7 @@ void Autopilot_Interface::start(void)
 				printf("\tOK\n");
 
 				printf("Intiial Position and Velocity...");
+				usleep(10000);
 				while (not (current_RX_messages.time_stamps.local_position_ned &&
 					current_RX_messages.time_stamps.attitude))
 				{
@@ -1355,7 +1370,9 @@ void Autopilot_Interface::start(void)
 					usleep(500000);
 				}
 				printf("\tOK\n");
-				//sleep(3);
+				sleep(3);
+
+				printf("All good!\n");
 
 				// copy initial position ned
 				{
@@ -1364,11 +1381,11 @@ void Autopilot_Interface::start(void)
 					initial_position.x = current_RX_messages.local_position_ned.data.x;
 					initial_position.y = current_RX_messages.local_position_ned.data.y;
 					initial_position.z = current_RX_messages.local_position_ned.data.z;
-					initial_position.vx = current_RX_messages.local_position_ned.data.vx;
-					initial_position.vy = current_RX_messages.local_position_ned.data.vy;
-					initial_position.vz = current_RX_messages.local_position_ned.data.vz;
+					initial_position.vx = 0.0;// current_RX_messages.local_position_ned.data.vx;
+					initial_position.vy = 0.0;// current_RX_messages.local_position_ned.data.vy;
+					initial_position.vz = 0.0;//current_RX_messages.local_position_ned.data.vz;
 					initial_position.yaw = current_RX_messages.attitude.data.yaw;
-					initial_position.yaw_rate = current_RX_messages.attitude.data.yawspeed;
+					initial_position.yaw_rate = 0.0;// current_RX_messages.attitude.data.yawspeed;
 				}
 #ifdef DEBUG
 				printf("INITIAL POSITION XYZ = [ %.4f , %.4f , %.4f ] \n", initial_position.x, initial_position.y, initial_position.z);
@@ -1851,7 +1868,7 @@ void Autopilot_Interface::write_thread(void)
 		std::lock_guard<std::mutex> lock(current_setpoint.mutex);
 		current_setpoint.data = sp;
 	}
-	printf("writing something\n");
+
 	// write a message and signal writing
 	write_setpoint();
 	writing_status = true;

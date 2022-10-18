@@ -317,6 +317,7 @@ public:
 	//Mavlink_Messages current_TX_messages;
 	mavlink_set_position_target_local_ned_t initial_position;
 
+	void get_setpoint(mavlink_set_position_target_local_ned_t& setpoint);
 	void update_setpoint(mavlink_set_position_target_local_ned_t setpoint);
 	void read_messages();
 	int  write_message(mavlink_message_t message);
