@@ -287,8 +287,7 @@ Autopilot_Interface::~Autopilot_Interface(){}
 void Autopilot_Interface::update_setpoint(mavlink_set_position_target_local_ned_t setpoint)
 {
 	std::lock_guard<std::mutex> lock(current_setpoint.mutex);
-	current_setpoint.data = setpoint;
-	current_setpoint.data.time_boot_ms = get_time_usec() / 1000;
+	current_setpoint.data = setpoint;	
 }
 void Autopilot_Interface::get_setpoint(mavlink_set_position_target_local_ned_t& setpoint)
 {
@@ -567,6 +566,42 @@ void Autopilot_Interface::read_messages(void)
 			break;
 		}
 
+		case MAVLINK_MSG_ID_COMMAND_INT:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_COMMAND_INT\n");
+#endif // DEBUG
+			std::lock_guard<std::mutex> lock(current_RX_messages.command_int.mutex);
+			mavlink_msg_command_int_decode(&message, &(current_RX_messages.command_int.data));
+			time_stamps_old.command_int = current_RX_messages.time_stamps.command_int;
+			current_RX_messages.time_stamps.command_int = get_time_usec();
+			break;
+		}
+
+		case MAVLINK_MSG_ID_COMMAND_LONG:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_COMMAND_LONG\n");
+#endif // DEBUG
+			std::lock_guard<std::mutex> lock(current_RX_messages.command_long.mutex);
+			mavlink_msg_command_long_decode(&message, &(current_RX_messages.command_long.data));
+			time_stamps_old.command_long = current_RX_messages.time_stamps.command_long;
+			current_RX_messages.time_stamps.command_long = get_time_usec();
+			break;
+		}
+
+		case MAVLINK_MSG_ID_COMMAND_ACK:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_COMMAND_ACK\n");
+#endif // DEBUG
+			std::lock_guard<std::mutex> lock(current_RX_messages.command_ack.mutex);
+			mavlink_msg_command_ack_decode(&message, &(current_RX_messages.command_ack.data));
+			time_stamps_old.command_ack = current_RX_messages.time_stamps.command_ack;
+			current_RX_messages.time_stamps.command_ack = get_time_usec();
+			break;
+		}
+
 		default:
 		{
 #ifdef DEBUG
@@ -604,7 +639,7 @@ void Autopilot_Interface::relay_read(void)
 		write_message(message);
 
 #ifdef DEBUG
-		printf("received msg to relay\n");
+		printf("Received msg to relay:\t");
 		// Store message sysid and compid.
 		// Note this doesn't handle multiple message sources.
 		current_RX_messages.sysid = message.sysid;
@@ -797,10 +832,34 @@ void Autopilot_Interface::relay_read(void)
 			break;
 		}
 
+		case MAVLINK_MSG_ID_COMMAND_INT:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_COMMAND_INT\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_COMMAND_LONG:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_COMMAND_LONG\n");
+#endif // DEBUG
+			break;
+		}
+
+		case MAVLINK_MSG_ID_COMMAND_ACK:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_COMMAND_ACK\n");
+#endif // DEBUG
+			break;
+		}
+
 		default:
 		{
 #ifdef DEBUG
-			printf("Warning, did not handle message id %i\n", message.msgid);
+			printf("WARNING: did not handle message id %i\n", message.msgid);
 #endif // DEBUG
 			break;
 		}
@@ -914,15 +973,17 @@ void Autopilot_Interface::write_setpoint(void)
 	// --------------------------------------------------------------------------
 	//   PACK PAYLOAD
 	// --------------------------------------------------------------------------
-
-	if (current_setpoint.time_ms_old == current_setpoint.data.time_boot_ms) return;
+	//if (current_setpoint.time_ms_old == current_setpoint.data.time_boot_ms) return;
+	//if (!current_setpoint.new_data_available) return;
+	//current_setpoint.new_data_available = false;
 
 	// pull from position target
 	mavlink_set_position_target_local_ned_t sp;
 	{
 		std::lock_guard<std::mutex> lock(current_setpoint.mutex);
-		sp = current_setpoint.data;
 		current_setpoint.time_ms_old = current_setpoint.data.time_boot_ms;
+		current_setpoint.data.time_boot_ms = get_time_usec() / 1000;
+		sp = current_setpoint.data;		
 	}
 
 	// double check some system parameters
@@ -931,6 +992,7 @@ void Autopilot_Interface::write_setpoint(void)
 	sp.target_system    = system_id;
 	sp.target_component = autopilot_id;
 
+	//printf("\nWriting new setpoint\n");
 
 	// --------------------------------------------------------------------------
 	//   ENCODE
@@ -955,10 +1017,10 @@ void Autopilot_Interface::write_setpoint(void)
 // ------------------------------------------------------------------------------
 //   Start Off-Board Mode
 // ------------------------------------------------------------------------------
-void Autopilot_Interface::enable_offboard_control()
+char Autopilot_Interface::enable_offboard_control()
 {
 	// Should only send this command once
-	if ( control_status == false )
+	if (control_status == false)
 	{
 #ifdef DEBUG
 		printf("ENABLE OFFBOARD MODE\n");
@@ -969,34 +1031,33 @@ void Autopilot_Interface::enable_offboard_control()
 		// ----------------------------------------------------------------------
 
 		// Sends the command to go off-board
-		int success = toggle_offboard_control( true );
 
 		// Check the command was written
-		if ( success )
+		if (toggle_offboard_control(true) > 0)
 			control_status = true;
 		else
 		{
-			fprintf(stderr,"Error: off-board mode not set, could not write message\n");
-			//throw EXIT_FAILURE;
+			fprintf(stderr, "Error: off-board mode not set, could not write message\n");
+			return -1;
 		}
 #ifdef DEBUG
 		printf("\n");
 #endif // DEBUG
+		return 1;
 
 	} // end: if not offboard_status
-
+	else return 0;
 }
 
 
 // ------------------------------------------------------------------------------
 //   Stop Off-Board Mode
 // ------------------------------------------------------------------------------
-void
-Autopilot_Interface::disable_offboard_control()
+char Autopilot_Interface::disable_offboard_control()
 {
 
 	// Should only send this command once
-	if ( control_status == true )
+	if (control_status == true)
 	{
 #ifdef DEBUG
 		printf("DISABLE OFFBOARD MODE\n");
@@ -1007,29 +1068,27 @@ Autopilot_Interface::disable_offboard_control()
 		// ----------------------------------------------------------------------
 
 		// Sends the command to stop off-board
-		int success = toggle_offboard_control( false );
-
 		// Check the command was written
-		if ( success )
+		if (toggle_offboard_control(false) > 0)
 			control_status = false;
 		else
 		{
-			fprintf(stderr,"Error: off-board mode not set, could not write message\n");
-			//throw EXIT_FAILURE;
+			fprintf(stderr, "Error: off-board mode not set, could not write message\n");
+			return -1;
 		}
 #ifdef DEBUG
 		printf("\n");
 #endif // DEBUG
+		return 1;
 
 	} // end: if offboard_status
-
+	else return 0;
 }
 
 // ------------------------------------------------------------------------------
 //   Arm
 // ------------------------------------------------------------------------------
-int
-Autopilot_Interface::arm_disarm( bool flag )
+char Autopilot_Interface::arm_disarm( bool flag )
 {
 #ifdef DEBUG
 	if (flag)
@@ -1047,33 +1106,83 @@ Autopilot_Interface::arm_disarm( bool flag )
 	com.target_system    = system_id;
 	com.target_component = autopilot_id;
 	com.command          = MAV_CMD_COMPONENT_ARM_DISARM;
-	com.confirmation     = true;
+	com.confirmation     = 0;
 	com.param1           = (float) flag;
 	com.param2           = 21196;
-
+	
 	// Encode
 	mavlink_message_t message;
 	mavlink_msg_command_long_encode(system_id, companion_id, &message, &com);
 
 	// Send the message
-	//int len = target_port->write_message(message);
 	int len = write_message(message);
+	if (len < 1)
+	{
+		printf("ERROR in arm_disarm: failed to write message\n");
+		return -1;
+	}
+	
+	
+	for (int i = 0; i < 10; i++)
+	{
+		usleep(1E5); //wait
 
+#ifdef DEBUG
+		printf("arm_disarm: Trying to check if armed for %i-th time\n", i);
+#endif // DEBUG
+
+
+		//check if confimation has been received
+		{
+			std::lock_guard<std::mutex> lock(current_RX_messages.command_ack.mutex);
+			if (current_RX_messages.command_ack.data.command == MAV_CMD_COMPONENT_ARM_DISARM &&\
+				current_RX_messages.command_ack.data.target_system == system_id)
+			{
+				if (current_RX_messages.command_ack.data.progress == 0)//success
+				{
+					if (flag)printf("WARNING: ARMED!\n");
+					else printf("WARNING: DISARMED!\n");
+					return 1;
+				} 
+				else
+				{
+					if (flag)printf("WARNING: ARMING DENINED\n");
+					else printf("WARNING: DISARMING DENINED\n");
+					return -1;
+				}
+			}
+		}
+		
+		com.confirmation++; //increment confirmation id
+
+		// Encode
+		mavlink_message_t message;
+		mavlink_msg_command_long_encode(system_id, companion_id, &message, &com);
+
+		// Send the message
+		len = write_message(message);
+		if (len < 1)
+		{
+			printf("ERROR in arm_disarm: failed to write message\n");
+			return -1;
+		}
+	}
 	// Done!
-	return len;
+	printf("ERROR in arm_disarmed: timeout\n");
+	return -1;
 }
 
 // ------------------------------------------------------------------------------
 //   Toggle Off-Board Mode
 // ------------------------------------------------------------------------------
-int Autopilot_Interface::toggle_offboard_control( bool flag )
+char Autopilot_Interface::toggle_offboard_control( bool flag )
 {
 	// Prepare command for off-board mode
 	mavlink_command_long_t com = { 0 };
 	com.target_system    = system_id;
 	com.target_component = autopilot_id;
 	com.command          = MAV_CMD_NAV_GUIDED_ENABLE;
-	com.confirmation     = true;
+	com.confirmation     = 0;
 	com.param1           = (float) flag; // flag >0.5 => start, <0.5 => stop
 
 	// Encode
@@ -1081,11 +1190,61 @@ int Autopilot_Interface::toggle_offboard_control( bool flag )
 	mavlink_msg_command_long_encode(system_id, companion_id, &message, &com);
 
 	// Send the message
-	//int len = target_port->write_message(message);
 	int len = write_message(message);
+	if (len < 1)
+	{
+		printf("ERROR in toggle_offboard_control: failed to write message\n");
+		return -1;
+	}
+
+	for (int i = 0; i < 10; i++)
+	{
+		usleep(1E5); //wait
+
+#ifdef DEBUG
+		printf("arm_disarm: Trying to check if offboard has been switched for %i-th time\n", i);
+#endif // DEBUG
+
+
+		//check if confimation has been received
+		{
+			std::lock_guard<std::mutex> lock(current_RX_messages.command_ack.mutex);
+			if (current_RX_messages.command_ack.data.command == MAV_CMD_NAV_GUIDED_ENABLE && \
+				current_RX_messages.command_ack.data.target_system == system_id)
+			{
+				if (current_RX_messages.command_ack.data.progress == 0)//success
+				{
+					if (flag)printf("WARNING: OFFBOARD MODE ON!\n");
+					else printf("WARNING: OFFBOARD MODE OFF!\n");
+					return 1;
+				}
+				else
+				{
+					printf("WARNING: OFFBOARD DENINED\n");
+					return -1;
+				}
+			}
+		}
+
+		com.confirmation++; //increment confirmation id
+
+		// Encode
+		mavlink_message_t message;
+		mavlink_msg_command_long_encode(system_id, companion_id, &message, &com);
+
+		// Send the message
+		len = write_message(message);
+		if (len < 1)
+		{
+			printf("ERROR in toggle_offboard_control: failed to write message\n");
+			return -1;
+		}
+	}
+
 
 	// Done!
-	return len;
+	printf("ERROR in toggle_offboard_control: timeout\n");
+	return -1;
 }
 
 // ------------------------------------------------------------------------------

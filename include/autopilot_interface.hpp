@@ -143,6 +143,9 @@ struct Time_Stamps
 	uint64_t odometry;
 	uint64_t altitude;
 	uint64_t estimator_status;
+	uint64_t command_int;
+	uint64_t command_long;
+	uint64_t command_ack;
 
 	void reset_timestamps()
 	{
@@ -160,6 +163,9 @@ struct Time_Stamps
 		odometry = 0;
 		altitude = 0;
 		estimator_status = 0;
+		command_int = 0;
+		command_long = 0;
+		command_ack = 0;
 	}
 
 };
@@ -256,6 +262,24 @@ struct Mavlink_Messages {
 		mavlink_estimator_status_t data;
 	}estimator_status;
 
+	// Message for encoding a command
+	struct {
+		std::mutex mutex;
+		mavlink_command_int_t data;
+	}command_int;
+
+	// Message for encoding a command
+	struct {
+		std::mutex mutex;
+		mavlink_command_long_t data;
+	}command_long;
+
+	// Command acknowledgement
+	struct {
+		std::mutex mutex;
+		mavlink_command_ack_t data;
+	}command_ack;
+
 	// System Parameters?
 
 
@@ -320,12 +344,12 @@ public:
 	void get_setpoint(mavlink_set_position_target_local_ned_t& setpoint);
 	void update_setpoint(mavlink_set_position_target_local_ned_t setpoint);
 	void read_messages();
-	int  write_message(mavlink_message_t message);
+	int write_message(mavlink_message_t message);
 	int relay_message(mavlink_message_t& message);
 
-	int	 arm_disarm( bool flag );
-	void enable_offboard_control(void);
-	void disable_offboard_control(void);
+	char arm_disarm( bool flag );
+	char enable_offboard_control(void);
+	char disable_offboard_control(void);
 
 	void start(void);
 	void stop(void);
@@ -364,6 +388,7 @@ private:
 		std::mutex mutex;
 		mavlink_set_position_target_local_ned_t data;
 		uint64_t time_ms_old;
+		bool new_data_available = false;
 	} current_setpoint;
 
 	struct {
@@ -379,7 +404,7 @@ private:
 	void sys_thread(void);
 	void relay_thread(void);
 
-	int toggle_offboard_control( bool flag );
+	char toggle_offboard_control( bool flag );
 	void write_setpoint();
 	void write_vision_position_estimate();
 	void sys_write(void);

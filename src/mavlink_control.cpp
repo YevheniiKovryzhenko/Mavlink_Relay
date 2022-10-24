@@ -34,6 +34,7 @@
 // ------------------------------------------------------------------------------
 
 #include "mavlink_control.hpp"
+#include "thread_defs.hpp"
 //#define DEBUG
 
 bool termination_requested = false;
@@ -228,7 +229,7 @@ int top (int argc, char **argv)
 		// --------------------------------------------------------------------------
 		//   RUN COMMANDS
 		// --------------------------------------------------------------------------
-		sleep(3);
+		usleep(5E5);
 		/*
 		* Now we can implement the algorithm we want on top of the autopilot interface
 		*/
@@ -277,23 +278,43 @@ int top (int argc, char **argv)
 
 void commands(Autopilot_Interface &api, bool autotakeoff)
 {		
-	// --------------------------------------------------------------------------
-	//   START OFFBOARD MODE
-	// --------------------------------------------------------------------------
-
-	api.enable_offboard_control();
-	usleep(10000); // give some time to let it sink in
+	// initialize command data strtuctures
+	mavlink_set_position_target_local_ned_t sp;
+	api.get_setpoint(sp);
+	mavlink_set_position_target_local_ned_t ip = api.initial_position;
+	api.update_setpoint(sp);
+	//for (int i = 0; i < 100; i++)
+	//{
+		//api.update_setpoint(sp);
+	//	usleep(1E6/WRITE_THREAD_HZ);
+	//}
 
 	// now the autopilot is accepting setpoint commands
 
 	//if(autotakeoff)
 	//{
 		// arm autopilot
-		api.arm_disarm(true);
-		usleep(100); // give some time to let it sink in
+	if (api.arm_disarm(true) < 0)
+	{
+		printf("ERROR in commands: failed to arm the system\n");
+		return;
+	}
+
+	//sleep(3);
+	// --------------------------------------------------------------------------
+	//   START OFFBOARD MODE
+	// --------------------------------------------------------------------------
+
+	if (api.enable_offboard_control() < 0)
+	{
+		printf("ERROR in commands: failed to put the system into offboard mode\n");
+		return;
+	}
+
 	//}
 
 		//return;
+	
 	// --------------------------------------------------------------------------
 	//   SEND OFFBOARD COMMANDS
 	// --------------------------------------------------------------------------
@@ -301,10 +322,7 @@ void commands(Autopilot_Interface &api, bool autotakeoff)
 	printf("SEND OFFBOARD COMMANDS\n");
 #endif // DEBUG
 
-	// initialize command data strtuctures
-	mavlink_set_position_target_local_ned_t sp;
-	api.get_setpoint(sp);
-	mavlink_set_position_target_local_ned_t ip = api.initial_position;
+	
 
 	// autopilot_interface.h provides some helper functions to build the command
 
@@ -327,7 +345,7 @@ void commands(Autopilot_Interface &api, bool autotakeoff)
 	// NOW pixhawk will try to move
 
 	// Wait for 8 seconds, check position
-	for (int i=0; i < 8; i++)
+	for (int i=0; i < 20; i++)
 	{
 		//mavlink_local_position_ned_t pos = api.current_RX_messages.local_position_ned;
 #ifdef DEBUG
@@ -352,14 +370,14 @@ void commands(Autopilot_Interface &api, bool autotakeoff)
 	// NOW pixhawk will try to move
 
 	// Wait for 4 seconds, check position
-	for (int i=0; i < 4; i++)
-	{
+	//for (int i=0; i < 4; i++)
+	//{
 		//mavlink_local_position_ned_t pos = api.current_RX_messages.local_position_ned;
 #ifdef DEBUG
 		//printf("%i CURRENT POSITION XYZ = [ % .4f , % .4f , % .4f ] \n", i, pos.x, pos.y, pos.z);
 #endif // DEBUG		
-		sleep(1);
-	}
+	//	sleep(1);
+	//}
 
 	//if(autotakeoff)
 	//{
