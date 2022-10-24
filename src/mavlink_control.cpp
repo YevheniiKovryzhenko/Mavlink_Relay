@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Last Edit:  10/12/2022 (MM/DD/YYYY)
+ * Last Edit:  10/24/2022 (MM/DD/YYYY)
  *
  * This process connects an external MAVLink UART device to send and receive data.
  */
@@ -279,10 +279,18 @@ int top (int argc, char **argv)
 void commands(Autopilot_Interface &api, bool autotakeoff)
 {		
 	// initialize command data strtuctures
-	mavlink_set_position_target_local_ned_t sp;
-	api.get_setpoint(sp);
+	mavlink_set_position_target_local_ned_t sp;	
 	mavlink_set_position_target_local_ned_t ip = api.initial_position;
-	api.update_setpoint(sp);
+
+	//zero-out velocity terms:
+	//Mavlink_Messages local_data = current_RX_messages;
+	ip.vx = 0.0;
+	ip.vy = 0.0;
+	ip.vz = 0.0;
+	ip.yaw_rate = 0.0;
+
+	api.update_setpoint(ip);
+	api.get_setpoint(sp);
 	//for (int i = 0; i < 100; i++)
 	//{
 		//api.update_setpoint(sp);
@@ -408,7 +416,6 @@ void commands(Autopilot_Interface &api, bool autotakeoff)
 
 		// disarm autopilot
 		api.arm_disarm(false);
-		usleep(100); // give some time to let it sink in
 	//}
 
 	// --------------------------------------------------------------------------

@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Last Edit:  10/14/2022 (MM/DD/YYYY)
+ * Last Edit:  10/24/2022 (MM/DD/YYYY)
  *
  * Functions for sending and recieving commands to an autopilot via MAVlink
  */
@@ -1123,9 +1123,9 @@ char Autopilot_Interface::arm_disarm( bool flag )
 	}
 	
 	
-	for (int i = 0; i < 10; i++)
+	for (int i = 0; i < 50; i++)
 	{
-		usleep(1E5); //wait
+		usleep(2E5); //wait
 
 #ifdef DEBUG
 		printf("arm_disarm: Trying to check if armed for %i-th time\n", i);
@@ -1197,9 +1197,9 @@ char Autopilot_Interface::toggle_offboard_control( bool flag )
 		return -1;
 	}
 
-	for (int i = 0; i < 10; i++)
+	for (int i = 0; i < 50; i++)
 	{
-		usleep(1E5); //wait
+		usleep(2E5); //wait
 
 #ifdef DEBUG
 		printf("arm_disarm: Trying to check if offboard has been switched for %i-th time\n", i);
@@ -1444,89 +1444,107 @@ void Autopilot_Interface::start(void)
 
 			// Wait for initial position ned
 			printf("Waiting for telemetry...\n");
-			sleep(3);
 			if (settings.enable_control)
 			{
-				printf("Attitude update...");
-				usleep(10000);
+				printf("Attitude Update..."); fflush(stdout);
+				usleep(1E5);
 				while (not (current_RX_messages.time_stamps.attitude && (current_RX_messages.estimator_status.data.flags & ESTIMATOR_ATTITUDE) == ESTIMATOR_ATTITUDE))
 				{
+#ifdef DEBUG
+					printf("flag = %i\n", current_RX_messages.estimator_status.data.flags);
+#endif // DEBUG
 					if (time_to_exit)
 						return;
-					usleep(500000);
+					usleep(1E5);
 				}
 				printf("\tOK\n");			
 				
-				printf("Horizontal velocity...");
-				usleep(10000);
+				printf("Horizontal Velocity..."); fflush(stdout);
+				usleep(1E5);
 				while (not ((current_RX_messages.estimator_status.data.flags & ESTIMATOR_VELOCITY_HORIZ) == ESTIMATOR_VELOCITY_HORIZ))
 				{
+#ifdef DEBUG
+					printf("flag = %i\n", current_RX_messages.estimator_status.data.flags);
+#endif // DEBUG
+
 					if (time_to_exit)
 						return;
-					usleep(500000);
+					usleep(1E5);
 				}
 				printf("\tOK\n");
 
-				printf("Vertical velocity...");
-				usleep(10000);
+				printf("Vertical Velocity..."); fflush(stdout);
+				usleep(1E5);
 				while (not ((current_RX_messages.estimator_status.data.flags & ESTIMATOR_VELOCITY_VERT) == ESTIMATOR_VELOCITY_VERT))
 				{
 					if (time_to_exit)
 						return;
-					usleep(500000);
+					usleep(1E5);
 				}
 				printf("\tOK\n");
 
-				printf("Horizontal Position...");
-				usleep(10000);
+				printf("Horizontal Position..."); fflush(stdout);
+				usleep(1E5);
 				while (not ((\
 					(current_RX_messages.estimator_status.data.flags & ESTIMATOR_POS_HORIZ_REL) == ESTIMATOR_POS_HORIZ_REL\
 					) && (\
 					(current_RX_messages.estimator_status.data.flags & ESTIMATOR_POS_HORIZ_ABS) == ESTIMATOR_POS_HORIZ_ABS\
 					)))
 				{
+#ifdef DEBUG
+					printf("flag = %i\n", current_RX_messages.estimator_status.data.flags);
+#endif // DEBUG
 					if (time_to_exit)
 						return;
-					usleep(500000);
+					usleep(1E5);
 				}
 				printf("\tOK\n");
 
-				printf("Vertical Position...");
-				usleep(10000);
+				printf("Vertical Position..."); fflush(stdout);
+				usleep(1E5);
 				while (not ((\
 					(current_RX_messages.estimator_status.data.flags & ESTIMATOR_POS_VERT_ABS) == ESTIMATOR_POS_VERT_ABS\
 					) && (\
 						(current_RX_messages.estimator_status.data.flags & ESTIMATOR_POS_VERT_AGL) == ESTIMATOR_POS_VERT_AGL\
 						)))
 				{
+#ifdef DEBUG
+					printf("flag = %i\n", current_RX_messages.estimator_status.data.flags);
+#endif // DEBUG
 					if (time_to_exit)
 						return;
-					usleep(500000);
+					usleep(1E5);
 				}
 				printf("\tOK\n");
 
-				printf("Horisonatal Position Prediction...");
-				usleep(10000);
+				printf("Horizontal Position Prediction..."); fflush(stdout);
+				usleep(1E5);
 				while (not ((\
 					(current_RX_messages.estimator_status.data.flags & ESTIMATOR_PRED_POS_HORIZ_REL) == ESTIMATOR_PRED_POS_HORIZ_REL\
 					) && (\
 						(current_RX_messages.estimator_status.data.flags & ESTIMATOR_PRED_POS_HORIZ_ABS) == ESTIMATOR_PRED_POS_HORIZ_ABS\
 						)))
 				{
+#ifdef DEBUG
+					printf("flag = %i\n", current_RX_messages.estimator_status.data.flags);
+#endif // DEBUG
 					if (time_to_exit)
 						return;
-					usleep(500000);
+					usleep(1E5);
 				}
-				printf("\tOK\n");
+				printf("\tOK\n");				
 
-				printf("Intiial Position and Velocity...");
-				usleep(10000);
+				printf("Initial Position and Velocity..."); fflush(stdout);
+				usleep(1E5);
 				while (not (current_RX_messages.time_stamps.local_position_ned &&
 					current_RX_messages.time_stamps.attitude))
 				{
+#ifdef DEBUG
+					printf("flag = %i\n", current_RX_messages.estimator_status.data.flags);
+#endif // DEBUG
 					if (time_to_exit)
 						return;
-					usleep(500000);
+					usleep(1E5);
 				}
 				printf("\tOK\n");
 				sleep(3);
@@ -1540,12 +1558,13 @@ void Autopilot_Interface::start(void)
 					initial_position.x = current_RX_messages.local_position_ned.data.x;
 					initial_position.y = current_RX_messages.local_position_ned.data.y;
 					initial_position.z = current_RX_messages.local_position_ned.data.z;
-					initial_position.vx = 0.0;// current_RX_messages.local_position_ned.data.vx;
-					initial_position.vy = 0.0;// current_RX_messages.local_position_ned.data.vy;
-					initial_position.vz = 0.0;//current_RX_messages.local_position_ned.data.vz;
+					initial_position.vx = current_RX_messages.local_position_ned.data.vx;
+					initial_position.vy = current_RX_messages.local_position_ned.data.vy;
+					initial_position.vz = current_RX_messages.local_position_ned.data.vz;
 					initial_position.yaw = current_RX_messages.attitude.data.yaw;
-					initial_position.yaw_rate = 0.0;// current_RX_messages.attitude.data.yawspeed;
+					initial_position.yaw_rate = current_RX_messages.attitude.data.yawspeed;
 				}
+
 #ifdef DEBUG
 				printf("INITIAL POSITION XYZ = [ %.4f , %.4f , %.4f ] \n", initial_position.x, initial_position.y, initial_position.z);
 				printf("INITIAL VELOCITY XYZ = [ %.4f , %.4f , %.4f ] \n", initial_position.vx, initial_position.vy, initial_position.vz);
