@@ -1140,6 +1140,7 @@ char Autopilot_Interface::arm_disarm( bool flag )
 			{
 				if (current_RX_messages.command_ack.data.progress == 0)//success
 				{
+					current_RX_messages.command_ack.data.progress = 10;
 					if (flag)printf("WARNING: ARMED!\n");
 					else printf("WARNING: DISARMED!\n");
 					return 1;
@@ -1181,9 +1182,18 @@ char Autopilot_Interface::toggle_offboard_control( bool flag )
 	mavlink_command_long_t com = { 0 };
 	com.target_system    = system_id;
 	com.target_component = autopilot_id;
-	com.command          = MAV_CMD_NAV_GUIDED_ENABLE;
+	com.command = MAV_CMD_DO_SET_MODE;// MAV_CMD_NAV_GUIDED_ENABLE;
 	com.confirmation     = 0;
-	com.param1           = (float) flag; // flag >0.5 => start, <0.5 => stop
+	//com.param1           = (float) flag; // flag >0.5 => start, <0.5 => stop
+	com.param1 = 1; //use custom PX4 mode
+	if (flag)
+	{
+		com.param2 = 6; //switch to offboard;
+	}
+	else
+	{
+		com.param2 = 3; //switch to position hold;
+	}
 
 	// Encode
 	mavlink_message_t message;
@@ -1209,11 +1219,12 @@ char Autopilot_Interface::toggle_offboard_control( bool flag )
 		//check if confimation has been received
 		{
 			std::lock_guard<std::mutex> lock(current_RX_messages.command_ack.mutex);
-			if (current_RX_messages.command_ack.data.command == MAV_CMD_NAV_GUIDED_ENABLE && \
+			if (current_RX_messages.command_ack.data.command == MAV_CMD_DO_SET_MODE && \
 				current_RX_messages.command_ack.data.target_system == system_id)
 			{
 				if (current_RX_messages.command_ack.data.progress == 0)//success
 				{
+					current_RX_messages.command_ack.data.progress = 10;
 					if (flag)printf("WARNING: OFFBOARD MODE ON!\n");
 					else printf("WARNING: OFFBOARD MODE OFF!\n");
 					return 1;

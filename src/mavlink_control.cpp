@@ -302,7 +302,7 @@ void commands(Autopilot_Interface &api, bool autotakeoff)
 	//if(autotakeoff)
 	//{
 		// arm autopilot
-	if (api.arm_disarm(true) < 0)
+	if (api.arm_disarm(true) < 1)
 	{
 		printf("ERROR in commands: failed to arm the system\n");
 		return;
@@ -313,7 +313,7 @@ void commands(Autopilot_Interface &api, bool autotakeoff)
 	//   START OFFBOARD MODE
 	// --------------------------------------------------------------------------
 
-	if (api.enable_offboard_control() < 0)
+	if (api.enable_offboard_control() < 1)
 	{
 		printf("ERROR in commands: failed to put the system into offboard mode\n");
 		return;
