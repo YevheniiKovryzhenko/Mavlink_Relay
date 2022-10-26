@@ -284,6 +284,18 @@ void commands(Autopilot_Interface &api, bool autotakeoff)
 	mavlink_set_position_target_local_ned_t sp;	
 	mavlink_set_position_target_local_ned_t ip = api.initial_position;
 
+	setpoint_guidance_t guide;
+	guidance_settings_t guide_settings;
+	guide_settings.enable_square = true;
+	guide_settings.square_settings.waypoint_delay_s = 3;
+	guide_settings.square_settings.X_time_s = 2;
+	guide_settings.square_settings.Y_time_s = 2;
+	guide_settings.square_settings.X_length_m = 2.0;
+	guide_settings.square_settings.Y_length_m = 2.0;
+	guide.reset();
+	double XYZ[3];
+	for (int i = 0; i < 3; i++) XYZ[i] = 0;
+
 	//zero-out velocity terms:
 	//Mavlink_Messages local_data = current_RX_messages;
 	ip.vx = 0.0;
@@ -356,19 +368,18 @@ void commands(Autopilot_Interface &api, bool autotakeoff)
 	api.update_setpoint(sp);
 	// NOW pixhawk will try to move
 
-	// Wait for 8 seconds, check position
+	// Wait for 8 seconds
 	sleep(3);
-	setpoint_guidance_t guide;
-	guidance_settings_t guide_settings;
-	guide_settings.enable_square = true;
-	guide_settings.square_settings.waypoint_delay_s = 3;
-	guide_settings.square_settings.X_time_s = 3;
-	guide_settings.square_settings.Y_time_s = 3;
-	guide_settings.square_settings.X_length_m = 0.5;
-	guide_settings.square_settings.Y_length_m = 0.5;
-	double XYZ[3];
+	set_position(0.0,       // [m]
+		0.0,       // [m]
+		ip.z - 1.0, // [m]
+		sp);
+	api.update_setpoint(sp);
+	sleep(5);
 
-	guide.start(guide_settings, ip.x, ip.y, ip.z);
+	
+
+	guide.start(guide_settings, 0, 0, ip.z - 1.0);
 	while (guide.march() == 0 && !guide.is_square_complete() && !termination_requested)
 	{
 		guide.get_XYZ(XYZ);
@@ -380,6 +391,7 @@ void commands(Autopilot_Interface &api, bool autotakeoff)
 
 		usleep(1E6 / WRITE_THREAD_HZ);
 	}
+	usleep(4);
 
 	// Example 2 - Set Velocity
 	//set_velocity( -1.0       , // [m/s]
@@ -410,7 +422,7 @@ void commands(Autopilot_Interface &api, bool autotakeoff)
 		// Example 3 - Land using fixed velocity
 		set_velocity(  0.0       , // [m/s]
 					   0.0       , // [m/s]
-					   1.0       , // [m/s]
+					   0.3       , // [m/s]
 					   sp        );
 
 		sp.type_mask |= MAVLINK_MSG_SET_POSITION_TARGET_LOCAL_NED_LAND;

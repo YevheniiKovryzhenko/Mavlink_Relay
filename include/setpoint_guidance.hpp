@@ -113,6 +113,7 @@ class setpoint_guidance_t
 private:
 	bool en_fl;								// initialization flag
 	double XYZ[3];
+	double XYZ0[3];
 
 	int march_XY(void);
 

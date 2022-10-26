@@ -597,9 +597,9 @@ int setpoint_guidance_t::start(guidance_settings_t guidance_settings_, double X0
     reset();
 
     settings = guidance_settings_;
-    XYZ[0] = X0;
-    XYZ[1] = Y0;
-    XYZ[2] = Z0;
+    XYZ0[0] = X0;
+    XYZ0[1] = Y0;
+    XYZ0[2] = Z0;
 
     if (unlikely(settings.enable_square && square.start(settings.square_settings) < 0))
     {
@@ -634,14 +634,17 @@ int setpoint_guidance_t::march(void)
 void setpoint_guidance_t::reset(void)
 {
     en_fl = false;
-    for (int i = 0; i < 3; i++) XYZ[i] = 0;
+    for (int i = 0; i < 3; i++) {
+        XYZ[i] = 0;
+        XYZ0[i] = 0;
+    }
     square.reset();
     return;
 }
 
 void setpoint_guidance_t::get_XYZ(double* XYZ_out)
 {
-    for (int i = 0; i < 0; i++) XYZ_out[i] = XYZ[i];
+    for (int i = 0; i < 3; i++) XYZ_out[i] = XYZ[i] + XYZ0[i];
     return;
 }
 
