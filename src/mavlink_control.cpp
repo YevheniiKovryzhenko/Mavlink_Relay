@@ -35,6 +35,8 @@
 
 #include "mavlink_control.hpp"
 #include "thread_defs.hpp"
+#include "setpoint_guidance.hpp"
+
 //#define DEBUG
 
 bool termination_requested = false;
@@ -355,15 +357,29 @@ void commands(Autopilot_Interface &api, bool autotakeoff)
 	// NOW pixhawk will try to move
 
 	// Wait for 8 seconds, check position
-	for (int i=0; i < 20; i++)
-	{
-		//mavlink_local_position_ned_t pos = api.current_RX_messages.local_position_ned;
-#ifdef DEBUG
-		//printf("%i CURRENT POSITION XYZ = [ % .4f , % .4f , % .4f ] \n", i, pos.x, pos.y, pos.z);
-#endif // DEBUG		
-		sleep(1);
-	}
+	sleep(3);
+	setpoint_guidance_t guide;
+	guidance_settings_t guide_settings;
+	guide_settings.enable_square = true;
+	guide_settings.square_settings.waypoint_delay_s = 3;
+	guide_settings.square_settings.X_time_s = 3;
+	guide_settings.square_settings.Y_time_s = 3;
+	guide_settings.square_settings.X_length_m = 0.5;
+	guide_settings.square_settings.Y_length_m = 0.5;
+	double XYZ[3];
 
+	guide.start(guide_settings, ip.x, ip.y, ip.z);
+	while (guide.march() == 0 && !guide.is_square_complete() && !termination_requested)
+	{
+		guide.get_XYZ(XYZ);
+		set_position(XYZ[0],       // [m]
+			XYZ[1],       // [m]
+			XYZ[2], // [m]
+			sp);
+		api.update_setpoint(sp);
+
+		usleep(1E6 / WRITE_THREAD_HZ);
+	}
 
 	// Example 2 - Set Velocity
 	//set_velocity( -1.0       , // [m/s]
