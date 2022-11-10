@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Last Edit:  10/25/2022 (MM/DD/YYYY)
+ * Last Edit:  11/11/2022 (MM/DD/YYYY)
  *
  * Functions for sending and recieving commands to an autopilot via MAVlink
  */
@@ -1558,23 +1558,32 @@ void Autopilot_Interface::start(void)
 					usleep(1E5);
 				}
 				printf("\tOK\n");
-				sleep(3);
 
-				printf("All good!\n");
-
-				// copy initial position ned
+				printf("All good! Receiving initial state...\t %5.1f%s\r",0.0,"%");
+				fflush(stdout);
+				uint wait_time_us = 10E6;
+				uint N_datas = 100;
+				mavlink_set_position_target_local_ned_t tmp_rx_pos;
+				memset(&tmp_rx_pos, 0, sizeof(tmp_rx_pos));
+				for (int i = 0; i < N_datas; i++)
 				{
-					std::lock_guard<std::mutex> lock(current_RX_messages.local_position_ned.mutex);
-					//Mavlink_Messages local_data = current_RX_messages;
-					initial_position.x = current_RX_messages.local_position_ned.data.x;
-					initial_position.y = current_RX_messages.local_position_ned.data.y;
-					initial_position.z = current_RX_messages.local_position_ned.data.z;
-					initial_position.vx = current_RX_messages.local_position_ned.data.vx;
-					initial_position.vy = current_RX_messages.local_position_ned.data.vy;
-					initial_position.vz = current_RX_messages.local_position_ned.data.vz;
-					initial_position.yaw = current_RX_messages.attitude.data.yaw;
-					initial_position.yaw_rate = current_RX_messages.attitude.data.yawspeed;
+					{
+						std::lock_guard<std::mutex> lock(current_RX_messages.local_position_ned.mutex);
+						tmp_rx_pos.x += current_RX_messages.local_position_ned.data.x / N_datas;
+						tmp_rx_pos.y += current_RX_messages.local_position_ned.data.y / N_datas;
+						tmp_rx_pos.z += current_RX_messages.local_position_ned.data.z / N_datas;
+						tmp_rx_pos.vx += current_RX_messages.local_position_ned.data.vx / N_datas;
+						tmp_rx_pos.vy += current_RX_messages.local_position_ned.data.vy / N_datas;
+						tmp_rx_pos.vz += current_RX_messages.local_position_ned.data.vz / N_datas;
+						tmp_rx_pos.yaw += current_RX_messages.attitude.data.yaw / N_datas;
+						tmp_rx_pos.yaw_rate += current_RX_messages.attitude.data.yawspeed / N_datas;
+					}
+					printf("All good! Receiving initial state...\t %5.1f%s\r", (double)(i + 1) / (double)N_datas * 100, "%");
+					fflush(stdout);
+					usleep(wait_time_us / N_datas);
 				}
+				printf("\nDone!\n");
+				initial_position = tmp_rx_pos;
 
 #ifdef DEBUG
 				printf("INITIAL POSITION XYZ = [ %.4f , %.4f , %.4f ] \n", initial_position.x, initial_position.y, initial_position.z);
