@@ -295,6 +295,7 @@ void Autopilot_Interface::get_setpoint(mavlink_set_position_target_local_ned_t& 
 	setpoint = current_setpoint.data;
 }
 
+//#define DEBUG
 // ------------------------------------------------------------------------------
 //   Read Messages
 // ------------------------------------------------------------------------------
@@ -313,6 +314,9 @@ void Autopilot_Interface::read_messages(void)
 	// ----------------------------------------------------------------------
 	if (success)
 	{
+#ifdef DEBUG
+printf("DEBUG: received good message from target!\n");
+#endif
 		if (settings.enable_relay) relay_message(message); //relay the message
 
 		// Store message sysid and compid.
@@ -617,7 +621,7 @@ void Autopilot_Interface::read_messages(void)
 
 	return;
 }
-
+//#define DEBUG
 // ------------------------------------------------------------------------------
 //   Read Messages
 // ------------------------------------------------------------------------------
@@ -661,6 +665,17 @@ void Autopilot_Interface::relay_read(void)
 		{
 #ifdef DEBUG
 			printf("MAVLINK_MSG_ID_SYS_STATUS\n");
+#endif // DEBUG
+			break;
+		}
+
+case MAVLINK_MSG_ID_MANUAL_CONTROL:
+		{
+#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_MANUAL_CONTROL\n");
+			mavlink_manual_control_t manual_control{};
+			mavlink_msg_manual_control_decode(&message, &manual_control);
+			printf("MSG: [%i, %i, %i, %i]\n",manual_control.x, manual_control.y, manual_control.z, manual_control.r);
 #endif // DEBUG
 			break;
 		}
@@ -869,11 +884,15 @@ void Autopilot_Interface::relay_read(void)
 	return;
 }
 
+//#define DEBUG
 // ------------------------------------------------------------------------------
 //   Relay Write
 // ------------------------------------------------------------------------------
 int Autopilot_Interface::relay_message(mavlink_message_t& message)
 {
+#ifdef DEBUG
+printf("DEBUG: trying to relay message...\n");
+#endif
 	// do the write
 	int len = relay_port->write_message(message);
 

@@ -34,7 +34,7 @@
 
 #include "udp_port.h"
 #include <sys/ioctl.h>
-
+//#define DEBUG
 
 // ----------------------------------------------------------------------------------
 //   UDP Port Manager Class
@@ -182,6 +182,10 @@ int UDP_Port::write_message(const mavlink_message_t& message)
 {
 	char buf[300];
 
+#ifdef DEBUG
+printf("DEBUG write_message: Trying to send mesage with UDP\n");
+#endif
+
 	// Translate message to buffer
 	unsigned len = mavlink_msg_to_send_buffer((uint8_t*)buf, &message);
 
@@ -318,6 +322,10 @@ int UDP_Port::_write_port(char* buf, unsigned len)
 {
 	// Lock
 	pthread_mutex_lock(&lock);
+
+#ifdef DEBUG
+printf("DEBUG _write_port: trying to send message with UDP\n");
+#endif
 
 	// Write packet via UDP link
 	int bytesWritten = sendto(sock, buf, len, 0, (struct sockaddr*)&target_addr, sizeof(struct sockaddr_in));
