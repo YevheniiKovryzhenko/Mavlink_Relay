@@ -36,7 +36,8 @@
 #include "autopilot_interface.hpp"
 #include "thread_defs.hpp"
 #include "tools.hpp"
-
+#include <common/mavlink.h>
+#include <development/development.h>
 
 // terminal emulator control sequences
 #define WRAP_DISABLE	"\033[?7l"
@@ -619,6 +620,22 @@ printf("DEBUG: received good message from target!\n");
 			break;
 		}
 
+		case MAVLINK_MSG_ID_ACTUATOR_OUTPUT_STATUS:
+		{
+			#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_ACTUATOR_OUTPUT_STATUS\n");
+			#endif
+			break;
+		}
+
+		case MAVLINK_MSG_ID_DEBUG_FLOAT_ARRAY:
+		{
+			#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_DEBUG_FLOAT_ARRAY\n");
+			#endif
+			break;
+		}
+
 		default:
 		{
 #ifdef DEBUG
@@ -895,6 +912,22 @@ case MAVLINK_MSG_ID_MANUAL_CONTROL:
 			break;
 		}
 
+		case MAVLINK_MSG_ID_ACTUATOR_OUTPUT_STATUS:
+		{
+			#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_ACTUATOR_OUTPUT_STATUS\n");
+			#endif
+			break;
+		}
+
+		case MAVLINK_MSG_ID_DEBUG_FLOAT_ARRAY:
+		{
+			#ifdef DEBUG
+			printf("MAVLINK_MSG_ID_DEBUG_FLOAT_ARRAY\n");
+			#endif
+			break;
+		}
+
 		default:
 		{
 #ifdef DEBUG
@@ -1002,7 +1035,7 @@ void Autopilot_Interface::sys_write(void)
 	
 	/* Send Status */
 	mavlink_msg_sys_status_pack(254, 190, &msg,\
-		0, 0, 0, 500, 11000, -1, -1, 0, 0, 0, 0, 0, 0);
+		0, 0, 0, 500, 11000, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 	len = write_message(msg);
 	// check the write
 	if (len <= 0) fprintf(stderr, "WARNING: could not send sys_status\n");

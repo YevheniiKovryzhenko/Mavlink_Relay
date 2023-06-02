@@ -52,7 +52,6 @@
 #include <stdbool.h>
 
 #include <common/mavlink.h>
-
 #include "generic_port.h"
 
 // ------------------------------------------------------------------------------
