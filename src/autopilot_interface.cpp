@@ -237,8 +237,12 @@ Autopilot_Interface::Autopilot_Interface(Generic_Port* target_port_, Generic_Por
 {
 	init(target_port_, relay_port_, settings_);
 }
+Autopilot_Interface::Autopilot_Interface(Generic_Port* target_port_, Generic_Port* relay_port_, Generic_Port* relay_port2_, settings_t& settings_)
+{
+	init(target_port_, relay_port_, relay_port2_, settings_);
+}
 
-void Autopilot_Interface::init(Generic_Port* target_port_, Generic_Port* relay_port_, settings_t& settings_)
+void Autopilot_Interface::init(Generic_Port* target_port_, Generic_Port* relay_port_, Generic_Port* relay_port2_, settings_t& settings_)
 {
 	// initialize attributes
 	write_count = 0;
@@ -268,13 +272,22 @@ void Autopilot_Interface::init(Generic_Port* target_port_, Generic_Port* relay_p
 
 	target_port = target_port_;
 	relay_port = relay_port_;
+	relay_port2 = relay_port2_;
 	return;
 }
 
 void Autopilot_Interface::init(Generic_Port* target_port_, settings_t& settings_)
 {
+	settings_.enable_relay2 = false;
 	settings_.enable_relay = false;
-	init(target_port_, relay_port, settings_);
+	init(target_port_, relay_port, relay_port2, settings_);
+	return;
+}
+
+void Autopilot_Interface::init(Generic_Port* target_port_,  Generic_Port* relay_port_, settings_t& settings_)
+{
+	settings_.enable_relay2 = false;
+	init(target_port_, relay_port_, relay_port2, settings_);
 	return;
 }
 
@@ -627,13 +640,24 @@ printf("DEBUG: received good message from target!\n");
 // ------------------------------------------------------------------------------
 void Autopilot_Interface::relay_read(void)
 {
-	bool success;               // receive success flag
+	bool success = false, success2 = false;               // receive success flag
 	// ----------------------------------------------------------------------
 	//   READ MESSAGE
 	// ----------------------------------------------------------------------
 
-	mavlink_message_t message;
+	mavlink_message_t message, message2;
 	success = relay_port->read_message(message, MAVLINK_COMM_1);
+	if (settings.enable_relay2)
+	{
+		success2 = relay_port2->read_message(message2, MAVLINK_COMM_1);
+
+		if (success2)
+		{
+			//printf("Received msg to relay2, back to target..\n");
+			write_message(message2);
+		}
+	}
+	
 
 	// ----------------------------------------------------------------------
 	//   HANDLE MESSAGE
@@ -895,6 +919,7 @@ printf("DEBUG: trying to relay message...\n");
 #endif
 	// do the write
 	int len = relay_port->write_message(message);
+	if (settings.enable_relay2) relay_port2->write_message(message);
 
 	// book keep
 	relay_write_count++;
@@ -910,6 +935,7 @@ int Autopilot_Interface::write_message(mavlink_message_t message)
 {
 	// do the write
 	int len = target_port->write_message(message);
+	
 
 	// book keep
 	write_count++;
@@ -1277,6 +1303,7 @@ char Autopilot_Interface::toggle_offboard_control( bool flag )
 	return -1;
 }
 
+//#define DEBUG
 // ------------------------------------------------------------------------------
 //   STARTUP
 // ------------------------------------------------------------------------------
@@ -1315,6 +1342,31 @@ void Autopilot_Interface::start(void)
 #ifdef DEBUG
 		printf("SYS thread started!\n");
 #endif // DEBUG		
+	}
+
+
+	if (settings.enable_relay2)
+	{
+		// --------------------------------------------------------------------------
+		//   CHECK PORT
+		// --------------------------------------------------------------------------
+		if (!settings.enable_relay)
+		{
+			fprintf(stderr, "ERROR: relay2 is enabled while there is no relay\n");
+			throw 1;
+		}
+
+#ifdef DEBUG
+		printf("Checking if relay_port2 is running...\n");
+#endif // DEBUG
+		if (!relay_port2->is_running()) // PORT_OPEN
+		{
+			fprintf(stderr, "ERROR: relay_port2 not open\n");
+			throw 1;
+		}
+#ifdef DEBUG
+		printf("Good.\n");
+#endif // DEBUG
 	}
 
 	if (settings.enable_relay)

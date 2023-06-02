@@ -13,6 +13,7 @@ typedef struct settings_t
 	int target_bind_port;
 
 	bool enable_relay;
+	bool enable_relay2;
 	bool relay_use_uart;
 	char* relay_uart_name;
 	int relay_baudrate;

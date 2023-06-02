@@ -71,6 +71,7 @@ int top (int argc, char **argv)
 	settings.target_bind_port = 14555;
 
 	settings.enable_relay = false;
+	settings.enable_relay2 = false;
 #ifdef __APPLE__
 	settings.relay_uart_name = (char*)"/dev/tty.usbmodem1";
 #else
@@ -116,6 +117,7 @@ int top (int argc, char **argv)
 	else
 	{
 		settings.enable_relay = false;
+		settings.enable_relay2 = false;
 		settings.enable_control = false;
 		settings.enable_vpe = false;
 		settings.enable_telemetry = false;
@@ -135,7 +137,7 @@ int top (int argc, char **argv)
 	 * pthread mutex lock. It can be a serial or an UDP port.
 	 *
 	 */
-	Generic_Port *target_port, *relay_port;
+	Generic_Port *target_port, *relay_port, *relay_port2;
 
 	if (settings.enable_target)
 	{
@@ -154,10 +156,26 @@ int top (int argc, char **argv)
 		if (settings.relay_use_udp)
 		{
 			relay_port = new UDP_Port(settings.relay_ip, settings.relay_port, settings.relay_bind_port);
+
+			//printf("relay port is %i and bind port is %i\n", settings.relay_port, settings.relay_bind_port);
+
+			if (settings.relay_port != 14550 && settings.relay_bind_port != 14555)
+			{
+				#ifdef DEBUG
+				printf("Enabling relay port 2...\n");
+				#endif
+				relay_port2 = new UDP_Port("127.0.0.1", 14550, 14555);
+				settings.enable_relay2 = true;
+			}
 		}
 		else
 		{
 			relay_port = new Serial_Port(settings.relay_uart_name, settings.relay_baudrate);
+			#ifdef DEBUG
+			printf("Enabling relay port 2...\n");
+			#endif
+			relay_port2 = new UDP_Port("127.0.0.1", 14550, 14555);
+			settings.enable_relay2 = true;
 		}
 	}
 
@@ -176,7 +194,7 @@ int top (int argc, char **argv)
 	* otherwise the vehicle will go into failsafe.
 	*
 	*/
-	Autopilot_Interface autopilot_interface(target_port, relay_port, settings);
+	Autopilot_Interface autopilot_interface(target_port, relay_port, relay_port2, settings);
 
 
 	/*
@@ -189,6 +207,7 @@ int top (int argc, char **argv)
 	*/
 	if (settings.enable_target) target_port_quit = target_port;
 	if (settings.enable_relay) relay_port_quit = relay_port;
+	if (settings.enable_relay2) relay_port_quit2 = relay_port2;
 	autopilot_interface_quit = &autopilot_interface;
 	signal(SIGINT, quit_handler);
 
@@ -215,7 +234,15 @@ int top (int argc, char **argv)
 #ifdef DEBUG
 		printf("Starting relay port...\n");
 #endif // DEBUG
-		relay_port->start();
+		relay_port->start();		
+	}
+
+	if (settings.enable_relay2) 
+	{
+#ifdef DEBUG
+printf("Starting relay port 2...\n");
+#endif // DEBUG
+		relay_port2->start();
 	}
 
 #ifdef DEBUG
@@ -263,6 +290,11 @@ int top (int argc, char **argv)
 	{
 		relay_port->stop();
 		delete relay_port;
+	}
+	if (settings.enable_relay2)
+	{
+		relay_port2->stop();
+		delete relay_port2;
 	}
 	// --------------------------------------------------------------------------
 	//   DONE
@@ -698,7 +730,7 @@ char parse_commandline(int argc, char **argv, settings_t& settings)
 		}
 
 		// relay UDP bind port
-		if (strcmp(argv[i], "-rb") == 0 || strcmp(argv[i], "--relay_bind_port") == 0) {
+		if (strcmp(argv[i], "-rbp") == 0 || strcmp(argv[i], "--relay_bind_port") == 0) {
 			if (argc > i + 1) {
 				i++;
 				settings.enable_relay = true;
@@ -831,6 +863,16 @@ void quit_handler( int sig )
 		catch (int error) {}
 
 		delete relay_port_quit;
+	}
+
+	if (relay_port_quit2 != nullptr)
+	{
+		try {
+			relay_port_quit2->stop();
+		}
+		catch (int error) {}
+
+		delete relay_port_quit2;
 	}	
 	// end program here
 	exit(0);

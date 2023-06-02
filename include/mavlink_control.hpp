@@ -66,6 +66,6 @@ char parse_commandline(int argc, char** argv, settings_t& settings);
 
 // quit handler
 Autopilot_Interface *autopilot_interface_quit;
-Generic_Port *target_port_quit, *relay_port_quit;
+Generic_Port *target_port_quit, *relay_port_quit, *relay_port_quit2;
 void quit_handler( int sig );
 

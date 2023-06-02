@@ -218,7 +218,7 @@ char UDP_Port::start()
 
 	memset(&bind_addr, 0, sizeof(sockaddr_in));
 	bind_addr.sin_family = AF_INET;
-	bind_addr.sin_addr.s_addr = inet_addr(target_ip); //INADDR_ANY;
+	bind_addr.sin_addr.s_addr = INADDR_ANY; //inet_addr(target_ip); //INADDR_ANY;
 	bind_addr.sin_port = htons(bind_port);
 	
 	/* Bind the socket to port 14551 - necessary to receive packets from qgroundcontrol */

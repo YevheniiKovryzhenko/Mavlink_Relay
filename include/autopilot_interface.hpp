@@ -319,6 +319,7 @@ public:
 	Autopilot_Interface();
 	Autopilot_Interface(Generic_Port* target_port_, settings_t& settings_);
 	Autopilot_Interface(Generic_Port* target_port_, Generic_Port* relay_port_, settings_t& settings_);
+	Autopilot_Interface(Generic_Port* target_port_, Generic_Port* relay_port_, Generic_Port* relay_port2_, settings_t& settings_);
 	~Autopilot_Interface();	
 
 	char printf_status;
@@ -366,6 +367,7 @@ public:
 private:
 	void init(Generic_Port* target_port_, settings_t& settings_);
 	void init(Generic_Port* target_port_, Generic_Port* relay_port_ , settings_t& settings_);
+	void init(Generic_Port* target_port_, Generic_Port* relay_port_ , Generic_Port* relay_port2_, settings_t& settings_);
 
 	settings_t settings;
 
@@ -373,7 +375,7 @@ private:
 
 	mocap_node_t mocap;
 
-	Generic_Port *target_port, *relay_port;
+	Generic_Port *target_port, *relay_port, *relay_port2;
 
 	bool time_to_exit;
 
