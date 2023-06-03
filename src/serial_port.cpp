@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Last Edit:  10/14/2022 (MM/DD/YYYY)
+ * Last Edit:  06/03/2022 (MM/DD/YYYY)
  *
  * Functions for opening, closing, reading and writing via serial ports.
  */
@@ -194,9 +194,7 @@ char Serial_Port::start()
 	// --------------------------------------------------------------------------
 	//   OPEN PORT
 	// --------------------------------------------------------------------------
-#ifdef DEBUG
-	printf("OPEN PORT\n");
-#endif // DEBUG
+	printf("Configuring Serial connection...\t");
 
 	// --------------------------------------------------------------------------
 	//   SETUP PORT
@@ -204,11 +202,11 @@ char Serial_Port::start()
 	if (serial.openDevice(uart_name, baudrate, \
 		SERIAL_DATABITS_8, SERIAL_PARITY_NONE, SERIAL_STOPBITS_1) < 0)
 	{
-		fprintf(stderr, "ERROR in start: failed to configure port %s with baudrate %i.\n", uart_name, baudrate);
+		fprintf(stderr, "\nERROR in start: failed to configure port %s with baudrate %i.\n", uart_name, baudrate);
 		return -1;
 	}
 	serial.flushReceiver();
-
+	printf("\tOK!\n");
 	// --------------------------------------------------------------------------
 	//   CONNECTED!
 	// --------------------------------------------------------------------------

@@ -22,7 +22,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Last Edit:  10/14/2022 (MM/DD/YYYY)
+ * Last Edit:  06/03/2022 (MM/DD/YYYY)
  *
  * Functions for opening, closing, reading and writing via UDP ports.
  */
@@ -207,6 +207,7 @@ char UDP_Port::start()
 	// --------------------------------------------------------------------------
 	//   OPEN PORT
 	// --------------------------------------------------------------------------
+	printf("Configuring UDP connection...\n");
 
 	/* Create socket */
 	sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -215,9 +216,7 @@ char UDP_Port::start()
 		fprintf(stderr, "ERROR: failed to create a socket\n");
 		return -1;
 	}
-
-	//char myIP[16];
-	//unsigned int myPort;
+	
 	socklen_t len = sizeof(bind_addr);
 	memset(&bind_addr, 0, sizeof(sockaddr_in));
 	bind_addr.sin_family = AF_INET;
@@ -228,9 +227,16 @@ char UDP_Port::start()
 	/* Bind the socket to port 14551 - necessary to receive packets from qgroundcontrol */
 	if (-1 == bind(sock, (struct sockaddr*)&bind_addr, len))
 	{
-		fprintf(stderr, "ERROR in start: failed to bind to socket %i\n", bind_port);
-		close(sock);
-		return -1;
+		fprintf(stderr, "ERROR in start: failed to bind to port %i. Let's find any port available...\t", bind_port);
+		bind_addr.sin_port = htons(0);
+		if (-1 == bind(sock, (struct sockaddr*)&bind_addr, len))
+		{
+			fprintf(stderr, "\nERROR in start: failed to bind to find available socket.\n");
+			close(sock);
+			return -1;
+		}
+		else printf("\tOK!\n");
+		
 	}
 	if (getsockname(sock, (struct sockaddr *) &bind_addr, &len) == -1)
 	{
@@ -259,6 +265,7 @@ char UDP_Port::start()
 	// --------------------------------------------------------------------------
 	inet_ntop(AF_INET, &bind_addr.sin_addr, local_ip, sizeof(local_ip));
 	bind_port = ntohs(bind_addr.sin_port);
+	printf("Established UDP communication\n");
 	printf("Local ip address: %s\n", local_ip);
 	printf("Binded to local port : %u\n", bind_port);
 	printf("Talking with %s on port %i\n", target_ip, target_port);
