@@ -104,7 +104,8 @@ private:
 	uint8_t buff[BUFF_LEN];
 	int buff_ptr;
 	int buff_len;
-	const char *target_ip = "127.0.0.1";
+	char target_ip[16] = "127.0.0.1";
+	char local_ip[16] = "0.0.0.0";
 	
 	int sock;
 	bool is_open;

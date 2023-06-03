@@ -46,7 +46,7 @@
 UDP_Port::UDP_Port(const char *target_ip_, int targetPort_, int bind_port_)
 {
 	initialize_defaults();
-	target_ip = target_ip_;
+	strcpy(target_ip, target_ip_);
 	target_port = targetPort_;
 	bind_port = bind_port_;
 	is_open = false;
@@ -66,7 +66,7 @@ UDP_Port::~UDP_Port()
 void UDP_Port::initialize_defaults()
 {
 	// Initialize attributes
-	target_ip = "127.0.0.1";
+	strcpy(target_ip, "127.0.0.1");
 	is_open = false;
 	sock = -1;
 	
@@ -216,15 +216,25 @@ char UDP_Port::start()
 		return -1;
 	}
 
+	//char myIP[16];
+	//unsigned int myPort;
+	socklen_t len = sizeof(bind_addr);
 	memset(&bind_addr, 0, sizeof(sockaddr_in));
 	bind_addr.sin_family = AF_INET;
 	bind_addr.sin_addr.s_addr = INADDR_ANY; //inet_addr(target_ip); //INADDR_ANY;
 	bind_addr.sin_port = htons(bind_port);
 	
+
 	/* Bind the socket to port 14551 - necessary to receive packets from qgroundcontrol */
-	if (-1 == bind(sock, (struct sockaddr*)&bind_addr, sizeof(struct sockaddr)))
+	if (-1 == bind(sock, (struct sockaddr*)&bind_addr, len))
 	{
 		fprintf(stderr, "ERROR in start: failed to bind to socket %i\n", bind_port);
+		close(sock);
+		return -1;
+	}
+	if (getsockname(sock, (struct sockaddr *) &bind_addr, &len) == -1)
+	{
+		fprintf(stderr, "ERROR in start: failed to check opened socket address\n");
 		close(sock);
 		return -1;
 	}
@@ -247,8 +257,11 @@ char UDP_Port::start()
 	// --------------------------------------------------------------------------
 	//   CONNECTED!
 	// --------------------------------------------------------------------------
-	printf("Binded to %i\n", bind_port);
-	printf("Listening to %s:%i\n", target_ip, target_port);
+	inet_ntop(AF_INET, &bind_addr.sin_addr, local_ip, sizeof(local_ip));
+	bind_port = ntohs(bind_addr.sin_port);
+	printf("Local ip address: %s\n", local_ip);
+	printf("Binded to local port : %u\n", bind_port);
+	printf("Talking with %s on port %i\n", target_ip, target_port);
 	lastStatus.packet_rx_drop_count = 0;
 
 	is_open = true;
