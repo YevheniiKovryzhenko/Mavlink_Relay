@@ -258,19 +258,30 @@ char serialib::openDevice(const char* Device, const unsigned int Bauds,
     speed_t         Speed;
     switch (Bauds)
     {
-    case 110:     Speed = B110; break;
-    case 300:     Speed = B300; break;
-    case 600:     Speed = B600; break;
-    case 1200:     Speed = B1200; break;
-    case 2400:     Speed = B2400; break;
-    case 4800:     Speed = B4800; break;
-    case 9600:     Speed = B9600; break;
-    case 19200:    Speed = B19200; break;
-    case 38400:    Speed = B38400; break;
-    case 57600:    Speed = B57600; break;
-    case 115200:   Speed = B115200; break;
+    case 110:       Speed = B110; break;
+    case 300:       Speed = B300; break;
+    case 600:       Speed = B600; break;
+    case 1200:      Speed = B1200; break;
+    case 2400:      Speed = B2400; break;
+    case 4800:      Speed = B4800; break;
+    case 9600:      Speed = B9600; break;
+    case 19200:     Speed = B19200; break;
+    case 38400:     Speed = B38400; break;
+    case 57600:     Speed = B57600; break;
+    case 115200:    Speed = B115200; break;
     case 230400:    Speed = B230400; break;
+    case 460800:    Speed = B460800; break;
+    case 500000:    Speed = B500000; break;
+    case 576000:    Speed = B576000; break;
     case 921600:    Speed = B921600; break;
+    case 1000000:   Speed = B1000000; break;
+    case 1152000:   Speed = B1152000; break;
+    case 1500000:   Speed = B1500000; break;
+    case 2000000:   Speed = B2000000; break;
+    case 2500000:   Speed = B2500000; break;
+    case 3000000:   Speed = B3000000; break;
+    case 3500000:   Speed = B3500000; break;
+    case 4000000:   Speed = B4000000; break;
     default: 
         fprintf(stderr, "ERROR in openDevice: unsupported baudrate\n");
         return -4;
