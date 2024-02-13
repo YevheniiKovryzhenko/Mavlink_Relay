@@ -15,6 +15,8 @@ add_subdirectory(libs) #libs/ has all of the required libraries
 
 add_executable(Mavlink_Relay ${ALL_MAIN}) #this tells the compiler what to compile (ALL_MAIN files) and calls them executables.
 
+source_group("ALL_FILES" FILES ${ALL_MAIN})
+
 # at this point we can compile all the sources and headers individually, but they don't see 
 # each other, so linking will fail. To fix this, add all the folders to the executable 
 # tree (called using variable "Main") so linker can search over it for all #inludes:
