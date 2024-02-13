@@ -85,7 +85,7 @@ int non_blocking_client_update(Autopilot_Interface* cli) {
                 switch (matched_str(words[i]))
                 {
                 case vehicle:
-                    if (cli->settings.enable_target)
+                    if (cli->settings.enable_target && words.size() > i+1)
                     {
                         switch (matched_str(words[i + 1]))
                         {
@@ -109,7 +109,7 @@ int non_blocking_client_update(Autopilot_Interface* cli) {
                     }
                     else
                     {
-                        printf("Error: must enable target for vehicle commands to be active\n");
+                        printf("Error: must enable target for vehicle commands to be active and specify command\n");
                         input.clear();
                         return 0;
                     }
