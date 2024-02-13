@@ -115,6 +115,7 @@ void* start_autopilot_interface_read_thread(void *args);
 void* start_autopilot_interface_write_thread(void *args);
 void* start_autopilot_interface_write_vision_position_estimate_thread(void* args);
 void* start_autopilot_interface_printf_thread(void* args);
+void* start_autopilot_interface_nonblock_io_thread(void* args);
 void* start_autopilot_interface_sys_thread(void* args);
 void* start_autopilot_interface_relay_thread(void* args);
 
@@ -325,6 +326,7 @@ public:
 	char printf_status;
 	char vision_position_writing_status;
 	char sys_status;
+	char nonblock_io_status;
 	char reading_status;
 	char relay_status;
 	char writing_status;
@@ -359,17 +361,18 @@ public:
 	void start_read_thread(void);
 	void start_write_thread(void);
 	void start_printf_thread(void);
+	void start_nonblock_io_thread(void);
 	void start_sys_thread(void);
 	void start_relay_thread(void);
 
 	void handle_quit( int sig );
 
+	settings_t settings;
+
 private:
 	void init(Generic_Port* target_port_, settings_t& settings_);
 	void init(Generic_Port* target_port_, Generic_Port* relay_port_ , settings_t& settings_);
 	void init(Generic_Port* target_port_, Generic_Port* relay_port_ , Generic_Port* relay_port2_, settings_t& settings_);
-
-	settings_t settings;
 
 	Time_Stamps time_stamps_old;
 
@@ -384,6 +387,7 @@ private:
 	thread_gen_t vision_position_estimate_write_tid;
 	thread_gen_t printf_tid;
 	thread_gen_t sys_tid;
+	thread_gen_t nonblock_io_tid;
 	thread_gen_t relay_tid;
 
 	struct {
@@ -403,9 +407,11 @@ private:
 	void write_thread(void);
 	void vision_position_estimate_write_thread(void);
 	void printf_thread(void);
+	void nonblock_io_thread(void);
 	void sys_thread(void);
 	void relay_thread(void);
 
+	void update_nonblock_io(void);
 	char toggle_offboard_control( bool flag );
 	void write_setpoint();
 	void write_vision_position_estimate();

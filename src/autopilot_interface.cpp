@@ -24,7 +24,7 @@
  *
  * Last Edit:  11/11/2022 (MM/DD/YYYY)
  *
- * Functions for sending and recieving commands to an autopilot via MAVlink
+ * Functions for sending and receiving commands to an autopilot via MAVlink
  */
 
 
@@ -32,12 +32,17 @@
 //   Includes
 // ------------------------------------------------------------------------------
 
+#include <iostream>
+#include <string>
+#include <sstream>
+
 #include <math.h>
 #include "autopilot_interface.hpp"
 #include "thread_defs.hpp"
 #include "tools.hpp"
 #include <common/mavlink.h>
 #include <development/development.h>
+#include "nonBlocking.hpp"
 
 // terminal emulator control sequences
 #define WRAP_DISABLE	"\033[?7l"
@@ -259,6 +264,7 @@ void Autopilot_Interface::init(Generic_Port* target_port_, Generic_Port* relay_p
 	write_tid.init(WRITE_THREAD_PRI, WRITE_THREAD_TYPE);
 	vision_position_estimate_write_tid.init(VPE_THREAD_PRI, VPE_THREAD_TYPE);
 	relay_tid.init(RELAY_THREAD_PRI, RELAY_THREAD_TYPE);
+	nonblock_io_tid.init(NONBLOCK_IO_THREAD_PRI, NONBLOCK_IO_THREAD_TYPE);
 	printf_tid.init(PRINTF_THREAD_PRI, PRINTF_THREAD_TYPE);
 	sys_tid.init(SYS_THREAD_PRI, SYS_THREAD_TYPE);
 
@@ -307,6 +313,14 @@ void Autopilot_Interface::get_setpoint(mavlink_set_position_target_local_ned_t& 
 {
 	std::lock_guard<std::mutex> lock(current_setpoint.mutex);
 	setpoint = current_setpoint.data;
+}
+
+// ------------------------------------------------------------------------------
+//   Update Non-blocking interface
+// ------------------------------------------------------------------------------
+void Autopilot_Interface::update_nonblock_io(void)
+{
+	non_blocking_client_update(this);   
 }
 
 //#define DEBUG
@@ -1738,6 +1752,9 @@ void Autopilot_Interface::start(void)
 #endif // DEBUG
 	}
 
+	result = nonblock_io_tid.start(&start_autopilot_interface_nonblock_io_thread, this);
+	if (result) throw result;
+
 #ifdef DEBUG
 	printf("Start routine is completed!\n");
 #endif // DEBUG
@@ -1768,6 +1785,7 @@ void Autopilot_Interface::stop(void)
 	write_tid.stop(WRITE_THREAD_TOUT);
 	sys_tid.stop(SYS_THREAD_TOUT);
 	relay_tid.stop(RELAY_THREAD_TOUT);
+	nonblock_io_tid.stop(NONBLOCK_IO_THREAD_TOUT);
 
 #ifdef DEBUG
 	printf("Trying to close mocap THREADS\n");
@@ -1820,6 +1838,24 @@ void Autopilot_Interface::start_write_thread(void)
 		return;
 	}
 
+}
+
+// ------------------------------------------------------------------------------
+//   Non-blocking Input-Output Thread (20Hz)
+// ------------------------------------------------------------------------------
+void Autopilot_Interface::start_nonblock_io_thread(void)
+{
+	if (not nonblock_io_status == false)
+	{
+		fprintf(stderr, "ERROR in start_nonblock_io_thread: thread already running\n");
+		return;
+	}
+
+	else
+	{
+		nonblock_io_thread();
+		return;
+	}
 }
 
 // ------------------------------------------------------------------------------
@@ -2191,6 +2227,25 @@ void Autopilot_Interface::write_thread(void)
 }
 
 // ------------------------------------------------------------------------------
+//   Non-blocking Input-Output Thread (20Hz)
+// ------------------------------------------------------------------------------
+void Autopilot_Interface::nonblock_io_thread(void)
+{
+	nonblock_io_status = true;
+	while (!time_to_exit)
+	{
+		update_nonblock_io();
+		usleep(1E6 / NONBLOCK_IO_THREAD_HZ);   // Stream at 20Hz
+	}
+
+	// signal end
+	nonblock_io_status = false;
+
+	return;
+
+}
+
+// ------------------------------------------------------------------------------
 //   sys Thread (1Hz)
 // ------------------------------------------------------------------------------
 void Autopilot_Interface::sys_thread(void)
@@ -2311,6 +2366,18 @@ void* start_autopilot_interface_sys_thread(void* args)
 
 	// run the object's read thread
 	autopilot_interface->start_sys_thread();
+
+	// done!
+	return NULL;
+}
+
+void* start_autopilot_interface_nonblock_io_thread(void* args)
+{
+	// takes an autopilot object argument
+	Autopilot_Interface* autopilot_interface = (Autopilot_Interface*)args;
+
+	// run the object's printf thread
+	autopilot_interface->start_nonblock_io_thread();
 
 	// done!
 	return NULL;
