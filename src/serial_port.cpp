@@ -215,8 +215,6 @@ char Serial_Port::start()
 
 	is_open = true;
 
-	printf("\n");
-
 	return 0;
 
 }

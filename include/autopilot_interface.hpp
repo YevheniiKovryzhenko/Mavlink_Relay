@@ -176,8 +176,8 @@ struct Time_Stamps
 
 struct Mavlink_Messages {	
 
-	int sysid;
-	int compid;
+	int sysid = -1;
+	int compid = -1;
 
 	// Heartbeat
 	struct {

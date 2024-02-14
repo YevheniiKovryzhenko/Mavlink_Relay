@@ -268,9 +268,9 @@ void Autopilot_Interface::init(Generic_Port* target_port_, Generic_Port* relay_p
 	printf_tid.init(PRINTF_THREAD_PRI, PRINTF_THREAD_TYPE);
 	sys_tid.init(SYS_THREAD_PRI, SYS_THREAD_TYPE);
 
-	system_id = 0; // system id
-	autopilot_id = 0; // autopilot component id
-	companion_id = 0; // companion computer component id
+	system_id = -1; // system id
+	autopilot_id = -1; // autopilot component id
+	companion_id = 0; // companion computer component id.
 
 	current_RX_messages.sysid = system_id;
 	current_RX_messages.compid = autopilot_id;	
@@ -349,8 +349,35 @@ printf("DEBUG: received good message from target!\n");
 
 		// Store message sysid and compid.
 		// Note this doesn't handle multiple message sources.
-		current_RX_messages.sysid = message.sysid;
-		current_RX_messages.compid = message.compid;
+		if (current_RX_messages.sysid == -1 || current_RX_messages.compid == -1) 
+		{
+			switch (static_cast<MAV_COMPONENT>(message.compid))
+			{
+			case MAV_COMP_ID_TELEMETRY_RADIO:
+			{
+				//static bool already_printed__ = false;
+				//if (!already_printed__) 
+				//{
+					printf("Got message from telemetry module, waiting for autopilot...\n");
+				//	already_printed__ = true;
+				//}
+				return;
+			}
+			case MAV_COMP_ID_AUTOPILOT1:
+			{
+				printf("Got message from autopilot\n");
+				current_RX_messages.sysid = message.sysid;
+				current_RX_messages.compid = message.compid;
+				break;
+			}
+			default:
+				printf("Got message from someone else with comp_id %i\n", message.compid);
+				current_RX_messages.sysid = message.sysid;
+				current_RX_messages.compid = message.compid;
+				break;
+			}
+		}
+		else if (current_RX_messages.sysid != message.sysid) return;
 
 		// Handle Message ID
 		switch (message.msgid)
@@ -1527,15 +1554,17 @@ void Autopilot_Interface::start(void)
 #ifdef DEBUG
 		printf("CHECK FOR MESSAGES\n");
 #endif // DEBUG
-		printf("Telemetry enabled, waiting for connection with the vehicle...\n");
-		while (not current_RX_messages.sysid)
+		if (current_RX_messages.sysid == -1)
 		{
-			if (time_to_exit) return;
-			usleep(500000); // check at 2Hz
+			printf("Telemetry enabled, waiting for connection with the vehicle...\n");
+			while (current_RX_messages.sysid == -1)
+			{
+				if (time_to_exit) return;
+				usleep(500000); // check at 2Hz
+			}
 		}
 
-#ifdef DEBUG
-		printf("Found\n");
+#ifdef DEBUG	
 
 		// now we know autopilot is sending messages
 		printf("\n");
@@ -1551,14 +1580,14 @@ void Autopilot_Interface::start(void)
 		// In which case set the id's manually.
 
 		// System ID
-		if (not system_id)
+		if (system_id == -1)
 		{
 			system_id = current_RX_messages.sysid;
 			printf("GOT VEHICLE SYSTEM ID: %i\n", system_id);
 		}
 
 		// Component ID
-		if (not autopilot_id)
+		if (autopilot_id == -1)
 		{
 			autopilot_id = current_RX_messages.compid;
 			printf("GOT AUTOPILOT COMPONENT ID: %i\n", autopilot_id);
@@ -1572,7 +1601,7 @@ void Autopilot_Interface::start(void)
 			// --------------------------------------------------------------------------
 
 			// Wait for initial position ned
-			printf("Waiting for telemetry...\n");
+			if (settings.enable_print) printf("Waiting for telemetry...\n");
 			if (settings.enable_control)
 			{
 				printf("Attitude Update..."); fflush(stdout);
