@@ -1,5 +1,5 @@
 .vscode
-**/.vs
+#**/.vs
 build/
 bin/
-.vs/
+#.vs/
