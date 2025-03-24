@@ -1,0 +1,22 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run Local Mocap",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/Mavlink_Relay",
+            "args": ["-m", "127.0.0.1", "-mI", "14", "-mY", "-pm"],
+            "cwd": "${workspaceFolder}",
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    ]
+}
