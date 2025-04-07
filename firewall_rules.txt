@@ -1,0 +1,23 @@
+#Firewalls can block multicast traffic. Temporarily disable the firewall on the Linux workstation to test:
+sudo ufw disable
+
+#If disabling the firewall resolves the issue, add rules to allow multicast traffic:
+sudo ufw allow in proto udp to 224.0.0.1 port 1551
+
+#Ensure the rule is correctly added by listing all ufw rules:
+sudo ufw status verbose
+
+#If the rule is missing or incorrectly formatted, remove and re-add it:
+sudo ufw delete allow in proto udp to 224.0.0.1 port 1551
+sudo ufw allow in proto udp to 224.0.0.1 port 1551
+
+#Multicast traffic is often interface-specific. Specify the network interface (e.g., eth0) in the rule:
+sudo ufw allow in on eth0 proto udp to 224.0.0.1 port 1551
+
+#If the above rule still doesn’t work, you can allow all multicast traffic on the specified port:
+sudo ufw allow in proto udp to 224.0.0.0/4 port 1551
+#This rule allows traffic to the entire multicast address range (224.0.0.0/4), which includes 224.0.0.1.
+
+#If the default ufw policy for incoming traffic is too restrictive, you can temporarily adjust it to allow all incoming traffic for testing:
+sudo ufw default allow incoming
+sudo ufw enable

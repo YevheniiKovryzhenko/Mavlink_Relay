@@ -26,7 +26,8 @@
 
 #define SOCKET int  // A sock handle is just an int in linux
 
-#define MULTICAST_ADDRESS   "239.255.42.99"     // IANA, local network
+// #define MULTICAST_ADDRESS   "239.255.42.99"     // IANA, local network
+#define MULTICAST_ADDRESS   "224.0.0.1"         // streaming outside of local network
 #define MULTICAST_ADDRESS_6 "0:0:0:0:0:FFFF:EFFF:2A63"	// ipv6 of above
 #define PORT_COMMAND        1510
 #define PORT_DATA           1511

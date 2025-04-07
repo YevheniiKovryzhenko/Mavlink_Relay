@@ -290,6 +290,7 @@ char mocap_node_t::init(std::string ip_addr)
             "receiving multicast packets.\n");
         return -1;
     }
+    // printf("Detected interface IP: %s\n", ip_addr.c_str());
 
     dataSocket = create_optitrack_data_socket(ip_addr, PORT_DATA);
 
@@ -313,21 +314,33 @@ char mocap_node_t::init(std::string ip_addr)
 // ------------------------------------------------------------------------------
 //   March MOCAP Node
 // ------------------------------------------------------------------------------
-char mocap_node_t::march(void)
-{
+char mocap_node_t::march(void) {
     // Block until we receive a datagram from the network
     sockaddr_in incomingAddress;
-    recvfrom(dataSocket, buff, BUFF_LEN, 0,
-        (sockaddr*)&incomingAddress, &ADDRLEN);
+    socklen_t addrLen = sizeof(incomingAddress);
+    ssize_t recvLen = recvfrom(dataSocket, buff, BUFF_LEN, 0,
+                               (sockaddr*)&incomingAddress, &addrLen);
+
+    if (recvLen < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            printf("[march] No data received within timeout period\n");
+        } else {
+            perror("[march] recvfrom() failed");
+        }
+        return -1;
+    }
 
     // Lock
-    pthread_mutex_lock(&lock);    
-    incomingMessages =
-        parse_optitrack_packet_into_messages(buff, BUFF_LEN);
+    pthread_mutex_lock(&lock);
+
+    // Parse the received packet
+    incomingMessages = parse_optitrack_packet_into_messages(buff, recvLen);
     time_us_old = time_us;
     time_us = get_time_usec();
+
     // Unlock
     pthread_mutex_unlock(&lock);
+
     return 0;
 }
 

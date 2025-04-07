@@ -196,70 +196,90 @@ SOCKET create_optitrack_data_socket_ipv6(const std::string& interfaceIp,
   return dataSocket;
 }
 
-SOCKET create_optitrack_data_socket(const std::string& interfaceIp,
-                                    unsigned short port) {
+SOCKET create_optitrack_data_socket(const std::string& interfaceIp, unsigned short port) {
   SOCKET dataSocket = socket(AF_INET, SOCK_DGRAM, 0);
-
-  // Prince: This variable is currently unused and causing a compiler warning
-  // However, I don't want to change the function prototype
-  port = port;
-
-  // allow multiple clients on same machine to use address/port
-  int value = 1;
-  int retval = setsockopt(dataSocket, SOL_SOCKET, SO_REUSEADDR, (char*)&value,
-                          sizeof(value));
-  if (retval < 0) {
-    close(dataSocket);
-    return -1;
+  if (dataSocket < 0) {
+      perror("[create_optitrack_data_socket] Socket creation failed");
+      return -1;
   }
 
+  // Allow multiple clients on the same machine to use the address/port
+  int reuseAddr = 1;
+  if (setsockopt(dataSocket, SOL_SOCKET, SO_REUSEADDR, (char*)&reuseAddr, sizeof(reuseAddr)) < 0) {
+      perror("[create_optitrack_data_socket] SO_REUSEADDR failed");
+      close(dataSocket);
+      return -1;
+  }
+
+  // Bind the socket to the specified port
   sockaddr_in socketAddr;
   memset(&socketAddr, 0, sizeof(socketAddr));
   socketAddr.sin_family = AF_INET;
-  socketAddr.sin_port = htons(PORT_DATA);
+  socketAddr.sin_port = htons(port);  // Use the provided port
   socketAddr.sin_addr.s_addr = INADDR_ANY;
-  if (bind(dataSocket, (sockaddr*)&socketAddr, sizeof(sockaddr)) < 0) {
-    printf("[create_optitrack_data_socket] bind failed.\n");
-    return -1;
+
+  if (bind(dataSocket, (struct sockaddr*)&socketAddr, sizeof(socketAddr)) < 0) {
+      perror("[create_optitrack_data_socket] Bind failed");
+      close(dataSocket);
+      return -1;
   } else {
-    printf(
-        "[create_optitrack_data_socket] bound to socket successfully on port "
-        "%d\n",
-        PORT_DATA);
+      printf("[create_optitrack_data_socket] Bound to socket successfully on port %d\n", port);
   }
 
-  // join multicast group
-  in_addr interfaceAddress;
+  // Validate the interface IP
+  struct in_addr interfaceAddress;
   interfaceAddress.s_addr = inet_addr(interfaceIp.c_str());
-
-  in_addr multicastAddress;
-  multicastAddress.s_addr = inet_addr(MULTICAST_ADDRESS);
-
-  ip_mreq Mreq;
-  Mreq.imr_multiaddr = multicastAddress;
-  Mreq.imr_interface = interfaceAddress;
-  retval = setsockopt(dataSocket, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*)&Mreq,
-                      sizeof(Mreq));
-  if (retval < 0) {
-    printf("[create_optitrack_data_socket] join failed.\n");
-    return -1;
-  } else {
-    printf(
-        "[create_optitrack_data_socket] joined multicast group at address %s\n",
-        MULTICAST_ADDRESS);
+  if (interfaceAddress.s_addr == INADDR_NONE) {
+      fprintf(stderr, "[create_optitrack_data_socket] Invalid interface IP: %s\n", interfaceIp.c_str());
+      close(dataSocket);
+      return -1;
   }
 
-  // create a 1MB buffer
-  int optval = 0x100000;
-  socklen_t optvalSize = 4;
-  setsockopt(dataSocket, SOL_SOCKET, SO_RCVBUF, (char*)&optval, optvalSize);
-  getsockopt(dataSocket, SOL_SOCKET, SO_RCVBUF, (char*)&optval, &optvalSize);
-  if (optval != 0x100000) {
-    printf("[create_optitrack_data_socket] ReceiveBuffer size = %d\n", optval);
+  // Validate the multicast address
+  struct in_addr multicastAddress;
+  multicastAddress.s_addr = inet_addr(MULTICAST_ADDRESS);
+  if (multicastAddress.s_addr == INADDR_NONE) {
+      fprintf(stderr, "[create_optitrack_data_socket] Invalid multicast address: %s\n", MULTICAST_ADDRESS);
+      close(dataSocket);
+      return -1;
+  }
+
+  // Join the multicast group
+  struct ip_mreq Mreq;
+  Mreq.imr_multiaddr.s_addr = multicastAddress.s_addr;
+  Mreq.imr_interface.s_addr = interfaceAddress.s_addr;
+
+  if (setsockopt(dataSocket, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*)&Mreq, sizeof(Mreq)) < 0) {
+      perror("[create_optitrack_data_socket] Join multicast group failed");
+      close(dataSocket);
+      return -1;
   } else {
-    printf(
-        "[create_optitrack_data_socket] Increased receive buffer size to %d\n",
-        optval);
+      printf("[create_optitrack_data_socket] Joined multicast group at address %s on interface %s\n",
+             MULTICAST_ADDRESS, interfaceIp.c_str());
+  }
+
+  // Increase the receive buffer size
+  // int optval = 0x100000;  // 1 MB
+  // socklen_t optvalSize = sizeof(optval);
+  // if (setsockopt(dataSocket, SOL_SOCKET, SO_RCVBUF, (char*)&optval, optvalSize) < 0) {
+  //     perror("[create_optitrack_data_socket] Failed to increase receive buffer size");
+  // } else {
+  //     // Verify the actual buffer size
+  //     if (getsockopt(dataSocket, SOL_SOCKET, SO_RCVBUF, (char*)&optval, &optvalSize) == 0) {
+  //         printf("[create_optitrack_data_socket] Receive buffer size set to %d\n", optval);
+  //     } else {
+  //         perror("[create_optitrack_data_socket] Failed to get receive buffer size");
+  //     }
+  // }
+
+  // Set a receive timeout to prevent recvfrom() from hanging indefinitely
+  struct timeval tv;
+  tv.tv_sec = 3;  // 3 second timeout
+  tv.tv_usec = 0;
+  if (setsockopt(dataSocket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
+      perror("[create_optitrack_data_socket] Failed to set receive timeout");
+  } else {
+      printf("[create_optitrack_data_socket] Set receive timeout to 1 second\n");
   }
 
   return dataSocket;

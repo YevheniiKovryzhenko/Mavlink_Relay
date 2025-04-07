@@ -6,7 +6,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/Mavlink_Relay",
-            "args": ["-m", "127.0.0.1", "-mI", "14", "-mY", "-pm"],
+            "args": ["-m", "192.168.1.1", "-mI", "14", "-mY", "-pm"],
             "cwd": "${workspaceFolder}",
             "externalConsole": false,
             "MIMode": "gdb",
@@ -17,6 +17,50 @@
                     "ignoreFailures": true
                 }
             ]
+        },
+        {
+            "name": "Run Multicast Sender",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/tests/multicast_sender",
+            "args": ["127.0.0.1"],
+            "cwd": "${workspaceFolder}",
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "build",
+            "miDebuggerPath": "/usr/bin/gdb"
+        },
+        {
+            "name": "Run Multicast Receiver",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/tests/multicast_receiver",
+            "args": ["127.0.0.1"],
+            "cwd": "${workspaceFolder}",
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "build",
+            "miDebuggerPath": "/usr/bin/gdb"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Run Sender and Receiver",
+            "configurations": ["Run Multicast Sender", "Run Multicast Receiver"]
         }
     ]
 }
