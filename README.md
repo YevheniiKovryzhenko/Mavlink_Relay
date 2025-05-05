@@ -12,6 +12,24 @@ data relay to/from local host.
 This is being largely phased out by my new UI-based application - [KGroundControl](https://github.com/YevheniiKovryzhenko/KGroundControl.git),
 so check it out!
 
+# Installation:
+The easiest way to get started in to install [WSL](https://learn.microsoft.com/en-us/windows/wsl/install), install [Debian](https://apps.microsoft.com/detail/9msvkqc78pk6?ocid=webpdpshare) and switch WSL version to 1. Once set up, you will need the following packages:
+```bash
+sudo apt-get update && sudo apt-get install cmake build-essential git -y
+```
+You can then clone the repo and compile using Cmake:
+```bash
+git clone https://github.com/YevheniiKovryzhenko/Mavlink_Relay.git
+cd Mavlink_Relay
+cmake -S ./ -B ./build
+cd build
+make
+```
+You can run Mavlink_Relay app with -h flag to see usage:
+```bash
+./Mavlink_Relay -h
+```
+
 # Contact
 If you have any questions, please feel free to contact me, Yevhenii (Jack) Kovryzhenko, at yzk0058@auburn.edu.
 
